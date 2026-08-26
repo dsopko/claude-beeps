@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash ~/.claude/hooks/notify.sh" }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash ~/.claude/hooks/notify.sh" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash ~/.claude/hooks/start.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash ~/.claude/hooks/stop.sh" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+# Runtime artifacts (only appear if you happen to run the scripts from within this repo)
+notify.log
+start-*.txt
+settings.json.bak*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

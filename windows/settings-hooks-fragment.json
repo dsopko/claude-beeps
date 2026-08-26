@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          { "type": "command", "command": "powershell -ExecutionPolicy Bypass -File C:/Users/<USERNAME>/.claude/hooks/notify.ps1" }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          { "type": "command", "command": "powershell -ExecutionPolicy Bypass -File C:/Users/<USERNAME>/.claude/hooks/notify.ps1" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "powershell -ExecutionPolicy Bypass -File C:/Users/<USERNAME>/.claude/hooks/start.ps1" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "powershell -ExecutionPolicy Bypass -File C:/Users/<USERNAME>/.claude/hooks/stop.ps1" }
+        ]
+      }
+    ]
+  }
+}
