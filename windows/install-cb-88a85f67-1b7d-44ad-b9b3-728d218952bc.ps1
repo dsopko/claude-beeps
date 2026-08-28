@@ -10,8 +10,9 @@
 #      and preserving all other top-level settings and existing hook
 #      groups on the same events.
 #   5. Validates the resulting JSON (restores backup on failure).
-#   6. Reports what changed. Does NOT restart Claude Code or trigger
-#      the /hooks reload — the caller (Claude, or the user) must do that.
+#   6. Reports what changed. Current Claude Code picks the new hook
+#      groups up on its own within seconds; no restart or /hooks reload
+#      is issued here, and none is normally needed.
 #
 # Idempotent: safe to re-run. Existing claude-beeps hook groups for this
 # PROJECT_ID are replaced in place; unrelated hook groups on the same
@@ -159,5 +160,6 @@ try {
 
 Write-Host ""
 Write-Host "Install complete."
-Write-Host "Reload required: run '/hooks' in Claude Code (dismiss the dialog) or restart claude."
+Write-Host "The hooks normally go live within seconds - just start your next turn."
+Write-Host "If a full turn passes with no chime, run '/hooks' in Claude Code (dismiss the dialog) or restart claude."
 if ($backup) { Write-Host "Backup preserved at: $backup" }

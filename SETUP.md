@@ -131,6 +131,13 @@ with the user that both played. If nothing played, check
 but Windows audio didn't play (muted, wrong output device, headphones
 elsewhere). No timestamp means the hook itself didn't fire.
 
+**What this does and does not prove.** These pipe-tests run the `.ps1`
+files directly, bypassing Claude Code's hook runner entirely. They
+prove the scripts work and the audio device works. They prove *nothing*
+about whether the hooks are registered and live. Don't tell the user
+"it's working" on the strength of the pipe-tests alone — liveness has
+its own evidence, covered in Step 8.
+
 Clean up the leftover start-verify.txt timestamp file if it wasn't
 consumed — the second pipe-test above should have removed it, but a
 lingering file is harmless.
@@ -159,16 +166,31 @@ If the user picks skip: go straight to Step 8.
 
 ## 8. Hand off
 
-Two things the user must do; you cannot do them for them:
+**Reloading is usually not required.** On Claude Code v2.1.250 the
+settings.json hook groups are picked up mid-session within seconds of
+the install writing them — no `/hooks`, no restart (verified
+2026-08-28). Older versions may behave differently, so confirm rather
+than assert. Do not tell the user to restart as a blanket instruction.
 
-1. **Reload hooks.** Either run `/hooks` in a Claude Code session
-   here (dismiss the menu — that reloads the config), or restart the
-   `claude` CLI. The config watcher does not pick up mid-session
-   settings.json edits automatically.
-2. **Trigger something.** Ask Claude a question in a new prompt.
-   When Claude finishes responding, they'll hear the "done" chime.
-   When Claude actually needs input (or when a non-allowlisted tool
-   is used and permission fires), they'll hear the rising chime.
+One thing the user must do:
+
+- **Trigger something.** Ask Claude a question in a new prompt. When
+  Claude finishes responding, they'll hear the "done" chime. When
+  Claude actually needs input (or when a non-allowlisted tool is used
+  and permission fires), they'll hear the rising chime.
+
+Then confirm liveness from evidence, not from the pipe-tests in Step 6
+(which bypass the hook runner — see the note there). Either of these
+proves the config loaded:
+
+- a line in `~/.claude/hooks/notify.log` that you did **not** pipe in
+  yourself — a real `PermissionRequest` or `Notification` entry
+- `~/.claude/hooks/start-<session_id>.txt` for the *current* session,
+  written by the `UserPromptSubmit` hook when the user submits a prompt
+
+If a full turn passes with neither signal, *then* have them run
+`/hooks` (dismiss the menu — that reloads the config) or restart the
+`claude` CLI.
 
 Tell them where the backup is, the log path
 (`~/.claude/hooks/notify.log`), and CLAUDE.md's operating mode entry
@@ -178,4 +200,5 @@ for future customization.
 
 You are now in operating mode — follow CLAUDE.md's operating-mode
 section. If the user asks to uninstall, run
-`windows/uninstall-<PROJECT_ID>.ps1` — same reload requirement.
+`windows/uninstall-<PROJECT_ID>.ps1` — the removal is picked up the
+same way, so `/hooks` is only needed if the beeps outlive it.

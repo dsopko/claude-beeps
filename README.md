@@ -89,15 +89,16 @@ project's PROJECT_ID yet, and follows `SETUP.md`'s install runbook: a
 brief interview (target dir, backup confirmation, WSL skip), one setup
 command, pipe-test verification, an offer to run the guided demo
 (~10 seconds — plays the "needs input" chime and the three finish-sound
-tiers), then hand-off with instructions to reload hooks via `/hooks`.
+tiers), then hand-off.
 
 **What happens on your machine:**
 - Three PowerShell scripts land in `%USERPROFILE%\.claude\hooks\`.
 - Your `%USERPROFILE%\.claude\settings.json` gets a backup at
   `settings.json.bak-install-<timestamp>` and then hook entries are
   merged in — nothing else is touched.
-- After you reload (`/hooks` in Claude Code, or restart), the next
-  turn plays the "done" chime.
+- The hooks go live on their own within seconds — the next turn plays
+  the "done" chime. No reload or restart needed on current Claude Code
+  (see [gotcha 3](#gotchas)).
 
 **Prefer to install without Claude?** The install script is the same
 one Claude runs — you can drive it yourself:
@@ -157,9 +158,22 @@ can extend it.)
    the `matcher` field. See [Notification subtype filtering](#notification-subtype-filtering)
    for the full list and the recommended matcher string.
 
-3. **Mid-session `settings.json` edits aren't live.** Claude Code reads
-   hooks at session start. After editing, run `/hooks` (then dismiss)
-   to reload the config, or restart `claude` entirely.
+3. **Mid-session `settings.json` edits *are* live — verify, don't
+   assume.** This entry used to claim the opposite. On Claude Code
+   v2.1.250, installing mid-session had `PermissionRequest` firing
+   15 seconds later with no `/hooks` and no restart (verified
+   2026-08-28). Older versions read hooks only at session start, so
+   don't assume either behavior — check for evidence:
+
+   - a line in `~/.claude/hooks/notify.log` you didn't pipe in yourself
+   - `start-<session_id>.txt` appearing for your *current* session
+
+   Beware the trap that produced the original wrong advice: the
+   install pipe-tests and the demo invoke the `.ps1` files directly,
+   bypassing the hook runner. Hearing those beeps tells you the
+   scripts and your speakers work — nothing more. If a full turn
+   passes with neither signal above, *then* run `/hooks` (then
+   dismiss) to reload, or restart `claude`.
 
 4. **Bypass-permissions mode kills `PermissionRequest`.** If the user
    has `--dangerously-skip-permissions` or accepted bypass mode, no
@@ -210,9 +224,11 @@ field to whitelist the ones that mean "you need to do something":
 ```
 
 The matcher is a regex-style alternation string. Add or remove subtypes
-by editing that string in `settings.json`, then run `/hooks` or restart
-Claude Code to reload. Reference: matcher list and payload fields from
-Claude Code's official hooks docs (`code.claude.com/docs/en/hooks`).
+by editing that string in `settings.json`; the change takes effect
+within seconds on current Claude Code, and `/hooks` or a restart is
+only needed if it doesn't (see [gotcha 3](#six-gotchas-all-lessons-learned-the-hard-way)).
+Reference: matcher list and payload fields from Claude Code's official
+hooks docs (`code.claude.com/docs/en/hooks`).
 
 **Log helps diagnosis.** `notify-cb-<PID>.ps1` writes each firing to
 `~/.claude/hooks/notify.log` including the `notification_type` and the
@@ -226,7 +242,11 @@ normal use — you'll see the exact string to add.
   calls. Edit `notify-cb-<PID>.ps1` and `stop-cb-<PID>.ps1` directly
   — no JSON escaping.
 - **Thresholds:** the `15` and `120` seconds are bare numbers in
-  `stop-cb-<PID>.ps1`. Change them, save, reload hooks.
+  `stop-cb-<PID>.ps1`. Change them and save — the hook scripts are
+  read fresh on every firing, so edits to the installed `.ps1` files
+  take effect on the next event with no reload at all. (Only
+  `settings.json` changes involve the config load; editing the copies
+  under `windows/` needs a reinstall to sync them across.)
 - **Notification subtypes:** see the section above — edit the `matcher`
   string on the Notification hook in `settings.json`.
 - **Note reference:** C5=523, D5=587, E5=659, F5=698, G5=784, A5=880,
@@ -285,7 +305,8 @@ Then optionally delete `~/.claude/hooks/notify-cb-<PID>.ps1`,
 `~/.claude/hooks/start-cb-<PID>.ps1`, `~/.claude/hooks/stop-cb-<PID>.ps1`,
 and `~/.claude/hooks/notify.log`.
 
-Restart Claude Code (or run `/hooks` and dismiss) to reload the config.
+The removal takes effect within seconds on current Claude Code. If the
+beeps outlive it, run `/hooks` (and dismiss) or restart Claude Code.
 
 ## How it works
 

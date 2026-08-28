@@ -124,5 +124,6 @@ Get-ChildItem $hooksDir -Filter 'start-*.txt' -ErrorAction SilentlyContinue | Fo
 }
 
 Write-Host ""
-Write-Host "Done. Restart Claude Code (or run /hooks once) so the change takes effect."
+Write-Host "Done. The removal normally takes effect within seconds."
+Write-Host "If the beeps outlive it, run /hooks once (dismiss the dialog) or restart Claude Code."
 Write-Host "Backup preserved at: $backup"

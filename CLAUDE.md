@@ -25,12 +25,14 @@ common answers include:
 - **"Reinstall"** or **"update the installed files"** — re-run
   `windows/install-<PROJECT_ID>.ps1`. Idempotent; overwrites the three
   hook scripts and refreshes the settings.json hook groups without
-  clobbering unrelated hooks. Remind them to run `/hooks` afterwards.
+  clobbering unrelated hooks. The change is normally picked up within
+  seconds — `/hooks` is only needed if it isn't (see rule 4).
 - **"Uninstall"**, **"remove"**, or **"start clean"** — run
   `windows/uninstall-<PROJECT_ID>.ps1`. It backs up settings.json,
   filters out only this project's hook groups, deletes the three hook
-  scripts and `notify.log`, and validates the result. Remind them to
-  run `/hooks` afterwards.
+  scripts and `notify.log`, and validates the result. The removal is
+  normally picked up within seconds — `/hooks` is only needed if it
+  isn't (see rule 4).
 - **"Change the sounds / thresholds / matcher"** — edit the source
   files under `windows/` first, then reinstall to sync. Sound patterns
   are `[console]::beep(HZ, MS)`; thresholds `15` and `120` are bare
@@ -63,9 +65,23 @@ common answers include:
    runner passes commands through a bash-like shell that eats `\` as
    escape chars — use forward slashes (`C:/Users/...`). PowerShell
    `-File` accepts both.
-4. **Never claim the beep is live after editing settings.json.** The
-   config watcher doesn't pick up mid-session edits. Tell the user to
-   run `/hooks` (dismiss the menu — that reloads) or restart claude.
+4. **Never claim the beep is live without evidence — and never claim
+   it isn't, either.** Claude Code v2.1.250 *does* pick up settings.json
+   hook changes mid-session, within seconds of the write, with no
+   `/hooks` and no restart (verified 2026-08-28). Older versions may
+   not, so don't assert either way from memory. Check for one of:
+   - a line in `~/.claude/hooks/notify.log` that you did **not** pipe
+     in yourself — a real `PermissionRequest` or `Notification` entry
+   - `~/.claude/hooks/start-<current session_id>.txt` appearing after
+     the user submits a prompt (written by the `UserPromptSubmit` hook)
+
+   Either one proves the hook runner loaded the config. Beeps you
+   produced by piping JSON into the `.ps1` files yourself prove only
+   that the scripts run and the audio device works — they say nothing
+   about whether the hooks are registered, so never cite the install
+   verify or the demo as evidence of liveness. If neither signal shows
+   up after a full turn, *then* have the user run `/hooks` (dismiss the
+   menu — that reloads) or restart claude.
 5. **Match the Notification hook's `matcher` field to the recommended
    set** unless the user asks otherwise: `agent_needs_input|elicitation_dialog|elicitation_url_dialog|quota_auto_resume_stale|quota_auto_resume_disabled`.
    Firing on every subtype means a ~60s idle-prompt nag after every
