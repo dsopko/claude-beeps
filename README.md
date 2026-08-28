@@ -45,14 +45,17 @@ then update this README's paths.
 
 ```
 claude-beeps/
-  README.md                                (this file)
+  README.md                                (this file — human-facing overview)
+  CLAUDE.md                                 Claude's operating manual for this repo
+  SETUP.md                                  Claude's install runbook
   PROJECT_ID                                stable "cb-<uuid>" identifier
   windows/
+    install-cb-<PID>.ps1                    Installer (copies hooks + merges settings.json)
+    uninstall-cb-<PID>.ps1                  Safe remover (only touches this project's hook groups)
     notify-cb-<PID>.ps1                     Notification + PermissionRequest hook
     start-cb-<PID>.ps1                      UserPromptSubmit hook (records timestamp)
     stop-cb-<PID>.ps1                       Stop hook (picks tier and plays it)
     settings-hooks-fragment.json            JSON to merge into ~/.claude/settings.json
-    uninstall-cb-<PID>.ps1                  Safe remover (only touches this project's hook groups)
   wsl/
     notify.sh
     start.sh
@@ -69,54 +72,44 @@ claude-beeps/
 `<PID>` is the value in `PROJECT_ID`, currently
 `88a85f67-1b7d-44ad-b9b3-728d218952bc`.
 
-## Install (Windows / PowerShell)
+## Install
 
-1. **Back up your existing settings** (if any):
-   ```powershell
-   Copy-Item "$env:USERPROFILE\.claude\settings.json" "$env:USERPROFILE\.claude\settings.json.bak"
-   ```
+Claude is the installer. Open a terminal, `cd` to the directory where you
+want claude-beeps to live, then paste:
 
-2. **Copy the hook scripts** into your `~/.claude/hooks/`:
-   ```powershell
-   $pid_ = (Get-Content .\PROJECT_ID -Raw).Trim()
-   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\hooks" | Out-Null
-   Copy-Item ".\windows\notify-$pid_.ps1" "$env:USERPROFILE\.claude\hooks\notify-$pid_.ps1"
-   Copy-Item ".\windows\start-$pid_.ps1"  "$env:USERPROFILE\.claude\hooks\start-$pid_.ps1"
-   Copy-Item ".\windows\stop-$pid_.ps1"   "$env:USERPROFILE\.claude\hooks\stop-$pid_.ps1"
-   ```
+```
+git clone https://github.com/dsopko/claude-beeps.git
+cd claude-beeps
+claude "set up claude-beeps"
+```
 
-3. **Merge the hooks block** from `windows/settings-hooks-fragment.json`
-   into `%USERPROFILE%\.claude\settings.json`. Replace `<USERNAME>` in
-   the command paths with your actual Windows username (or use
-   `$env:USERNAME` when scripting the install). Do **not** overwrite
-   other keys like `permissions`, `model`, etc. — merge the `hooks`
-   object in.
+Claude reads `CLAUDE.md`, notices no hooks are installed for this
+project's PROJECT_ID yet, and follows `SETUP.md`'s install runbook: a
+brief interview (target dir, backup confirmation, WSL skip), one setup
+command, pipe-test verification, then hand-off with instructions to
+reload hooks via `/hooks`.
 
-4. **Validate the JSON:**
-   ```powershell
-   Get-Content "$env:USERPROFILE\.claude\settings.json" -Raw | ConvertFrom-Json | Out-Null
-   "JSON OK"
-   ```
+**What happens on your machine:**
+- Three PowerShell scripts land in `%USERPROFILE%\.claude\hooks\`.
+- Your `%USERPROFILE%\.claude\settings.json` gets a backup at
+  `settings.json.bak-install-<timestamp>` and then hook entries are
+  merged in — nothing else is touched.
+- After you reload (`/hooks` in Claude Code, or restart), the next
+  turn plays the "done" chime.
 
-5. **Pipe-test each script** before launching Claude Code:
-   ```powershell
-   $pid_ = (Get-Content .\PROJECT_ID -Raw).Trim()
-   '{"session_id":"t","hook_event_name":"Notification","notification_type":"agent_needs_input","notification_text":"test"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\notify-$pid_.ps1"
-   '{"session_id":"t"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\start-$pid_.ps1"
-   '{"session_id":"t"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\stop-$pid_.ps1"
-   ```
-   You should hear the rising chime, then the short "done" chime.
+**Prefer to install without Claude?** The install script is the same
+one Claude runs — you can drive it yourself:
 
-6. **Restart Claude Code** (or open `/hooks` once and dismiss — that
-   reloads the config). Mid-session `settings.json` edits aren't picked
-   up automatically.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\install-cb-88a85f67-1b7d-44ad-b9b3-728d218952bc.ps1
+```
 
-7. **Confirm in `/hooks`** — should show 4 events: `Notification`,
-   `PermissionRequest`, `UserPromptSubmit`, `Stop`.
+Preview mode: append `-DryRun` — nothing is written, but the exact
+copies and merges are printed.
 
 ## Install (WSL)
 
-See `wsl/WSL-SETUP.md`. Short version:
+Not yet automated — see `wsl/WSL-SETUP.md`. Short version:
 
 - Copy `wsl/*.sh` into `~/.claude/hooks/` inside WSL and `chmod +x` them.
 - Requires `jq` (`sudo apt install -y jq`) and working `powershell.exe`
@@ -240,7 +233,11 @@ Anything else in those arrays (HTTP hooks, other projects' hooks with
 different GUIDs, different paths) belongs to something else — leave it
 alone.
 
-**Automated (recommended):**
+**Ask Claude:** in a session started from this repo, say "uninstall
+claude-beeps" / "start clean" / "remove". Claude follows CLAUDE.md's
+operating-mode instructions and runs the uninstaller for you.
+
+**Or run it yourself:**
 
 ```powershell
 # Windows
