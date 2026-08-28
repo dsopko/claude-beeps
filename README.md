@@ -87,8 +87,9 @@ claude "set up claude-beeps"
 Claude reads `CLAUDE.md`, notices no hooks are installed for this
 project's PROJECT_ID yet, and follows `SETUP.md`'s install runbook: a
 brief interview (target dir, backup confirmation, WSL skip), one setup
-command, pipe-test verification, then hand-off with instructions to
-reload hooks via `/hooks`.
+command, pipe-test verification, an offer to run the guided demo
+(~10 seconds — plays the "needs input" chime and the three finish-sound
+tiers), then hand-off with instructions to reload hooks via `/hooks`.
 
 **What happens on your machine:**
 - Three PowerShell scripts land in `%USERPROFILE%\.claude\hooks\`.

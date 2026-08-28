@@ -135,7 +135,29 @@ Clean up the leftover start-verify.txt timestamp file if it wasn't
 consumed — the second pipe-test above should have removed it, but a
 lingering file is harmless.
 
-## 7. Hand off
+## 7. Offer the demo
+
+The pipe-tests in Step 6 already confirmed audio works, but they were
+minimal. Now offer the full guided demo — it takes ~10 seconds and
+teaches the user what each sound means so they recognize them during
+real work.
+
+Call `AskUserQuestion` with a single question:
+
+- Question: "Install worked. Want a quick demo of what each sound
+  means? Takes about 10 seconds — plays the 'needs input' chime, then
+  the three finish-sound tiers (short / normal / long) back to back."
+- Option 1 label: "Yes — play the demo" — you'll follow DEMO.md Path A.
+- Option 2 label: "Skip — I'll hear them naturally" — skip to Step 8.
+
+If the user picks yes: **follow DEMO.md, Path A.** The install just
+finished so the detection in DEMO.md Step 0 will pick Path A
+automatically. Do not paraphrase the DEMO.md text; that runbook was
+tuned so the audio and the on-screen explanation line up.
+
+If the user picks skip: go straight to Step 8.
+
+## 8. Hand off
 
 Two things the user must do; you cannot do them for them:
 
@@ -152,7 +174,7 @@ Tell them where the backup is, the log path
 (`~/.claude/hooks/notify.log`), and CLAUDE.md's operating mode entry
 for future customization.
 
-## 8. After install
+## 9. After install
 
 You are now in operating mode — follow CLAUDE.md's operating-mode
 section. If the user asks to uninstall, run
