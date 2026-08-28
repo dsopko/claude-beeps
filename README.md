@@ -11,8 +11,13 @@ regardless of which side you're running Claude Code on).
 
 ## What you get
 
-- **Rising chime** (1200 -> 1500 Hz) when Claude needs your attention
-  (`Notification` and `PermissionRequest` events).
+- **Rising chime** (1200 -> 1500 Hz) when Claude actually needs you —
+  when it asks a question (`agent_needs_input`), when an MCP server
+  needs input (`elicitation_dialog`, `elicitation_url_dialog`), when a
+  quota auto-resume is stuck (`quota_auto_resume_stale`,
+  `quota_auto_resume_disabled`), and when Claude needs permission for a
+  tool call (via the separate `PermissionRequest` event). Idle-attention
+  nags are silenced. See [Notification subtype filtering](#notification-subtype-filtering).
 - **Three-tier done sound** on the `Stop` event, based on elapsed
   seconds since your last prompt:
   - `< 15s`  -> **Short**  (2 beeps, `C5, E5`)
@@ -105,10 +110,15 @@ See `wsl/WSL-SETUP.md`. Short version:
    fails. Use `C:/Users/me/.claude/hooks/start.ps1` — PowerShell `-File`
    accepts forward slashes fine.
 
-2. **Both `Notification` AND `PermissionRequest` are needed.**
-   `Notification` only fires for in-app attention pings (AskUserQuestion,
-   idle timers). Permission prompts use the separate `PermissionRequest`
-   event. Wire the same script to both.
+2. **Both `Notification` AND `PermissionRequest` are needed, but
+   `Notification` needs a matcher.** `Notification` fires for twelve
+   subtypes — including a ~60s post-turn idle nag (`idle_prompt`) that
+   will drive you crazy without a filter. Permission prompts use the
+   separate `PermissionRequest` event, and also re-fire ~6s later as
+   `Notification(permission_prompt)`, which would double-beep. We wire
+   both events but restrict the `Notification` hook to a whitelist via
+   the `matcher` field. See [Notification subtype filtering](#notification-subtype-filtering)
+   for the full list and the recommended matcher string.
 
 3. **Mid-session `settings.json` edits aren't live.** Claude Code reads
    hooks at session start. After editing, run `/hooks` (then dismiss)
@@ -130,12 +140,57 @@ See `wsl/WSL-SETUP.md`. Short version:
    sound = Windows audio problem. No timestamp = hook not wired or not
    loaded (see #3).
 
+## Notification subtype filtering
+
+Claude Code's `Notification` event carries a `notification_type` field
+identifying which of twelve subtypes fired. We use the hook's `matcher`
+field to whitelist the ones that mean "you need to do something":
+
+| Subtype | What fires it | We beep? |
+|---|---|---|
+| `permission_prompt` | Claude Code shows a permission dialog | No — `PermissionRequest` fires ~6s earlier for the same event; skip to avoid double-beep |
+| `idle_prompt` | Claude has been idle ~60s post-turn and pokes you | No — this is the annoying one |
+| `auth_success` | OAuth / auth flow completes | No — informational |
+| `elicitation_dialog` | An MCP server needs your input via dialog | **Yes** |
+| `elicitation_url_dialog` | An MCP server needs you to visit a URL (usually for auth) | **Yes** |
+| `elicitation_complete` | An MCP elicitation interaction finishes | No — informational |
+| `elicitation_response` | You respond to an MCP elicitation | No — informational |
+| `agent_needs_input` | A subagent or agent needs input to proceed | **Yes** |
+| `agent_completed` | A subagent or agent finishes | No — `Stop` hook already handles turn-complete beeps |
+| `quota_auto_resume_fired` | Quota auto-resume activated and resumed the session | No — informational (working as designed) |
+| `quota_auto_resume_stale` | Quota auto-resume finds the session stuck / stale | **Yes** — session waiting on you |
+| `quota_auto_resume_disabled` | Quota auto-resume is off or unavailable | **Yes** — nothing will happen without you |
+
+**Recommended matcher (in `settings-hooks-fragment.json`):**
+
+```json
+"Notification": [
+  {
+    "matcher": "agent_needs_input|elicitation_dialog|elicitation_url_dialog|quota_auto_resume_stale|quota_auto_resume_disabled",
+    "hooks": [ { "type": "command", "command": "..." } ]
+  }
+]
+```
+
+The matcher is a regex-style alternation string. Add or remove subtypes
+by editing that string in `settings.json`, then run `/hooks` or restart
+Claude Code to reload. Reference: matcher list and payload fields from
+Claude Code's official hooks docs (`code.claude.com/docs/en/hooks`).
+
+**Log helps diagnosis.** `notify.ps1` writes each firing to
+`~/.claude/hooks/notify.log` including the `notification_type` and the
+`notification_text` (Claude's human-readable message). If a subtype
+you'd like to beep on isn't in the matcher yet, watch the log during
+normal use — you'll see the exact string to add.
+
 ## Customizing
 
 - **Sounds:** all beep patterns are `[console]::beep(FREQUENCY_HZ, DURATION_MS)`
   calls. Edit `notify.ps1` and `stop.ps1` directly — no JSON escaping.
 - **Thresholds:** the `15` and `120` seconds are bare numbers in
   `stop.ps1`. Change them, save, reload hooks.
+- **Notification subtypes:** see the section above — edit the `matcher`
+  string on the Notification hook in `settings.json`.
 - **Note reference:** C5=523, D5=587, E5=659, F5=698, G5=784, A5=880,
   B5=988, C6=1047, D6=1175, E6=1319, G6=1568. Musical intervals in the
   same key sound "chime-like"; random pitches sound like error tones.
@@ -188,8 +243,11 @@ Restart Claude Code (or run `/hooks` and dismiss) to reload the config.
   `session_id` so concurrent Claude Code sessions don't collide.
 - `stop.ps1` (`Stop` event) reads that file, computes elapsed seconds,
   picks the tier, plays the beeps, and deletes the timestamp file.
-- `notify.ps1` (`Notification` + `PermissionRequest` events) just plays
-  the rising chime and appends a line to `notify.log`.
+- `notify.ps1` (`Notification` + `PermissionRequest` events) plays the
+  rising chime and appends `{timestamp} {event} [{notification_type}] {notification_text}`
+  to `notify.log`. The `matcher` field on the Notification hook filters
+  which subtypes reach this script — Claude Code short-circuits before
+  even spawning PowerShell for subtypes that don't match.
 
 All three scripts read the hook input JSON from stdin using
 `[Console]::In.ReadToEnd() | ConvertFrom-Json`. The WSL versions use

@@ -1,12 +1,18 @@
 # Notification + PermissionRequest hook - plays the "needs input" rising chime.
-# Logs which event fired it so wiring can be verified via notify.log.
+# Also logs the event name, notification_type (only present on Notification), and
+# notification_text (Claude's human-readable message) for future diagnosis.
 $evt = "unknown"
+$type = ""
+$text = ""
 try {
     $j = [Console]::In.ReadToEnd() | ConvertFrom-Json
-    if ($j.hook_event_name) { $evt = $j.hook_event_name }
+    if ($j.hook_event_name)   { $evt  = $j.hook_event_name }
+    if ($j.notification_type) { $type = $j.notification_type }
+    if ($j.notification_text) { $text = $j.notification_text }
 } catch {}
 
-"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $evt fired" |
+$typePart = if ($type) { "[$type] " } else { "" }
+"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $evt $typePart$text" |
     Out-File -Append -Encoding ascii "$env:USERPROFILE\.claude\hooks\notify.log"
 
 [console]::beep(1200,150)
