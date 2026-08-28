@@ -41,6 +41,12 @@ common answers include:
   file is the settings-hooks-fragment.json plus the three hook scripts
   under `windows/`. Compare against `~/.claude/hooks/notify-<PROJECT_ID>.ps1`
   etc. and the hook groups in `~/.claude/settings.json`.
+- **"Demo the beeps"**, **"play the sounds"**, **"show me what it
+  sounds like"** — read **DEMO.md** and follow it exactly. It plays
+  the notification chime and the three finish-sound tiers through the
+  installed hooks, with a continue/quit prompt in the middle. Don't
+  paraphrase the runbook into a shorter version; the pacing and the
+  on-screen text were tuned to line up with the audio.
 
 ## Rules
 
@@ -87,6 +93,8 @@ Replace `<PROJECT_ID>` with the value in `PROJECT_ID`.
   five ps1 files and update settings-hooks-fragment.json to match.
 - `README.md` — human-facing overview.
 - `SETUP.md` — install runbook (this is what you follow in install mode).
+- `DEMO.md` — demo runbook (this is what you follow when the user
+  asks to hear the sounds).
 - `windows/` — hook scripts, install/uninstall scripts, settings fragment.
 - `wsl/` — bash equivalents for running Claude Code inside WSL. Not
   auto-installed by the Windows installer; see `wsl/WSL-SETUP.md`.

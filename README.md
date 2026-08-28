@@ -48,6 +48,7 @@ claude-beeps/
   README.md                                (this file — human-facing overview)
   CLAUDE.md                                 Claude's operating manual for this repo
   SETUP.md                                  Claude's install runbook
+  DEMO.md                                   Claude's demo runbook
   PROJECT_ID                                stable "cb-<uuid>" identifier
   windows/
     install-cb-<PID>.ps1                    Installer (copies hooks + merges settings.json)
@@ -106,6 +107,14 @@ powershell -ExecutionPolicy Bypass -File .\windows\install-cb-88a85f67-1b7d-44ad
 
 Preview mode: append `-DryRun` — nothing is written, but the exact
 copies and merges are printed.
+
+**Want to hear the sounds?** After install, ask Claude in this repo:
+"demo the beeps" (or "play the sounds", or "show me what claude-beeps
+sounds like"). Claude reads `DEMO.md` and plays the "needs input"
+chime, prints a tier table, asks you continue/quit, and plays the
+three finish-sound tiers back-to-back through the actual installed
+hooks. Total runtime ~10 seconds — no waiting for 15-second or
+2-minute turns to hear the different tiers.
 
 ## Install (WSL)
 
