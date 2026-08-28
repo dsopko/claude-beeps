@@ -108,13 +108,20 @@ powershell -ExecutionPolicy Bypass -File .\windows\install-cb-88a85f67-1b7d-44ad
 Preview mode: append `-DryRun` — nothing is written, but the exact
 copies and merges are printed.
 
-**Want to hear the sounds?** After install, ask Claude in this repo:
-"demo the beeps" (or "play the sounds", or "show me what claude-beeps
-sounds like"). Claude reads `DEMO.md` and plays the "needs input"
-chime, prints a tier table, asks you continue/quit, and plays the
-three finish-sound tiers back-to-back through the actual installed
-hooks. Total runtime ~10 seconds — no waiting for 15-second or
-2-minute turns to hear the different tiers.
+**Want to hear the sounds?** Ask Claude in this repo: "demo the beeps"
+(or "play the sounds", or "show me what claude-beeps sounds like").
+Claude reads `DEMO.md` and plays the "needs input" chime, prints a
+tier table, asks you continue/quit, and plays the three finish-sound
+tiers back-to-back. Total runtime ~10 seconds — no waiting for
+15-second or 2-minute turns to hear the different tiers.
+
+Works before install too: `DEMO.md` has two paths. If hooks are
+installed, they fire through the real chain (proves your install
+works, leaves entries in `notify.log`, and you'll hear a real fourth
+sound at end-of-turn). If hooks aren't installed yet, Claude reads
+the beep sequences straight out of the source `.ps1` files and plays
+them inline — same audio, no side effects, no need for
+`~/.claude/hooks/` to exist yet.
 
 ## Install (WSL)
 
