@@ -29,11 +29,13 @@ claude-beeps/
     start.ps1                           UserPromptSubmit hook (records timestamp)
     stop.ps1                            Stop hook (picks tier and plays it)
     settings-hooks-fragment.json        JSON to merge into ~/.claude/settings.json
+    uninstall.ps1                       Safe remover (only touches our hook groups)
   wsl/
     notify.sh
     start.sh
     stop.sh
     settings-hooks-fragment.json
+    uninstall.sh
     WSL-SETUP.md                        WSL-specific setup guide
   demo/
     beeps.ps1                           Standalone: `. beeps.ps1` then
@@ -140,10 +142,44 @@ See `wsl/WSL-SETUP.md`. Short version:
 
 ## Uninstall
 
-- Delete the four hook entries from `~/.claude/settings.json` (keep the
-  rest of the file).
-- Optionally delete `~/.claude/hooks/*.ps1` and `~/.claude/hooks/notify.log`.
-- Restart Claude Code or reload via `/hooks`.
+The `Notification`, `PermissionRequest`, `UserPromptSubmit`, and `Stop`
+events can each hold **multiple hook groups** — Claude Code itself adds
+some internal HTTP hooks under those same events. Don't wipe the whole
+event key; remove only the hook groups whose `command` references
+claude-beeps scripts.
+
+**Fingerprint of a claude-beeps hook:** `type: "command"` where the
+inner `hooks[].command` mentions `notify.ps1`, `start.ps1`, or `stop.ps1`
+(or the `.sh` equivalents on WSL). Anything else in those arrays
+(HTTP hooks, other tools' commands, different paths) belongs to
+something else — leave it alone.
+
+**Automated (recommended):**
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File .\windows\uninstall.ps1
+```
+```bash
+# WSL
+bash ./wsl/uninstall.sh
+```
+
+Both scripts back up `settings.json` first, filter out only the claude-beeps
+hook groups, drop any event key whose array ends up empty, delete the
+`.ps1`/`.sh` scripts and `notify.log`, and validate the resulting JSON.
+
+**Manual:** edit `~/.claude/settings.json` and for each of the four events:
+
+1. In the event's array, delete the hook group whose inner `command`
+   contains one of our script names.
+2. If that group was the only entry, remove the event key entirely.
+3. If other groups remain, keep the event key with just those.
+
+Then optionally delete `~/.claude/hooks/{notify,start,stop}.ps1` and
+`~/.claude/hooks/notify.log`.
+
+Restart Claude Code (or run `/hooks` and dismiss) to reload the config.
 
 ## How it works
 
