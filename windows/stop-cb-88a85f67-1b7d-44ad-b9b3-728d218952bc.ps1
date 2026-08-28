@@ -1,4 +1,5 @@
-# Stop hook - reads timestamp from start.ps1, picks beep tier by elapsed seconds:
+# Stop hook - reads timestamp written by the paired start-<PROJECT_ID>.ps1 hook,
+# picks beep tier by elapsed seconds:
 #   < 15s     -> Short  (2 beeps)
 #   15s..120s -> Normal (4 beeps)
 #   > 120s    -> Long   (13 beeps)

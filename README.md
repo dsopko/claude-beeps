@@ -9,6 +9,23 @@ Works on Windows (PowerShell) and inside WSL (bash scripts calling
 `powershell.exe` over interop, so beeps play through Windows audio
 regardless of which side you're running Claude Code on).
 
+## Project identity
+
+The file `PROJECT_ID` at the repo root holds a stable identifier
+(`cb-<uuid>`) for this project. That identifier is the suffix on every
+`.ps1` script name, so hook files installed to `~/.claude/hooks/`
+carry their origin in the filename. Two claude-beeps installs from
+forks with different IDs can coexist in the same hooks directory
+without stepping on each other, and the uninstaller reads
+`PROJECT_ID` at runtime to know which files belong to it.
+
+**This project's identifier:** `cb-88a85f67-1b7d-44ad-b9b3-728d218952bc`
+
+If you fork and want a fresh namespace, generate a new GUID
+(`[guid]::NewGuid()` in PowerShell), overwrite `PROJECT_ID`, and
+rename the five `.ps1` files to match (`notify-<newid>.ps1`, etc.),
+then update this README's paths.
+
 ## What you get
 
 - **Rising chime** (1200 -> 1500 Hz) when Claude actually needs you —
@@ -28,25 +45,29 @@ regardless of which side you're running Claude Code on).
 
 ```
 claude-beeps/
-  README.md                            (this file)
+  README.md                                (this file)
+  PROJECT_ID                                stable "cb-<uuid>" identifier
   windows/
-    notify.ps1                          Notification + PermissionRequest hook
-    start.ps1                           UserPromptSubmit hook (records timestamp)
-    stop.ps1                            Stop hook (picks tier and plays it)
-    settings-hooks-fragment.json        JSON to merge into ~/.claude/settings.json
-    uninstall.ps1                       Safe remover (only touches our hook groups)
+    notify-cb-<PID>.ps1                     Notification + PermissionRequest hook
+    start-cb-<PID>.ps1                      UserPromptSubmit hook (records timestamp)
+    stop-cb-<PID>.ps1                       Stop hook (picks tier and plays it)
+    settings-hooks-fragment.json            JSON to merge into ~/.claude/settings.json
+    uninstall-cb-<PID>.ps1                  Safe remover (only touches this project's hook groups)
   wsl/
     notify.sh
     start.sh
     stop.sh
     settings-hooks-fragment.json
     uninstall.sh
-    WSL-SETUP.md                        WSL-specific setup guide
+    WSL-SETUP.md                            WSL-specific setup guide
   demo/
-    beeps.ps1                           Standalone: `. beeps.ps1` then
-                                        `Triumphant`, `BellTower`, `Arpeggio`,
-                                        `CallResp` to play named sounds
+    beeps-cb-<PID>.ps1                      Standalone demo (`. beeps-cb-<PID>.ps1` then
+                                            `Triumphant`, `BellTower`, `Arpeggio`,
+                                            `CallResp` to play named sounds)
 ```
+
+`<PID>` is the value in `PROJECT_ID`, currently
+`88a85f67-1b7d-44ad-b9b3-728d218952bc`.
 
 ## Install (Windows / PowerShell)
 
@@ -57,10 +78,11 @@ claude-beeps/
 
 2. **Copy the hook scripts** into your `~/.claude/hooks/`:
    ```powershell
+   $pid_ = (Get-Content .\PROJECT_ID -Raw).Trim()
    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\hooks" | Out-Null
-   Copy-Item .\windows\notify.ps1 "$env:USERPROFILE\.claude\hooks\notify.ps1"
-   Copy-Item .\windows\start.ps1  "$env:USERPROFILE\.claude\hooks\start.ps1"
-   Copy-Item .\windows\stop.ps1   "$env:USERPROFILE\.claude\hooks\stop.ps1"
+   Copy-Item ".\windows\notify-$pid_.ps1" "$env:USERPROFILE\.claude\hooks\notify-$pid_.ps1"
+   Copy-Item ".\windows\start-$pid_.ps1"  "$env:USERPROFILE\.claude\hooks\start-$pid_.ps1"
+   Copy-Item ".\windows\stop-$pid_.ps1"   "$env:USERPROFILE\.claude\hooks\stop-$pid_.ps1"
    ```
 
 3. **Merge the hooks block** from `windows/settings-hooks-fragment.json`
@@ -78,9 +100,10 @@ claude-beeps/
 
 5. **Pipe-test each script** before launching Claude Code:
    ```powershell
-   '{"session_id":"t","hook_event_name":"Notification"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\notify.ps1"
-   '{"session_id":"t"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\start.ps1"
-   '{"session_id":"t"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\stop.ps1"
+   $pid_ = (Get-Content .\PROJECT_ID -Raw).Trim()
+   '{"session_id":"t","hook_event_name":"Notification","notification_type":"agent_needs_input","notification_text":"test"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\notify-$pid_.ps1"
+   '{"session_id":"t"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\start-$pid_.ps1"
+   '{"session_id":"t"}' | powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\stop-$pid_.ps1"
    ```
    You should hear the rising chime, then the short "done" chime.
 
@@ -101,13 +124,17 @@ See `wsl/WSL-SETUP.md`. Short version:
 - Merge `wsl/settings-hooks-fragment.json` into `~/.claude/settings.json`
   inside WSL. No path substitution needed — uses `~` throughout.
 
+(WSL bash scripts don't currently carry the project id in their names;
+if you want the same namespace isolation on the WSL side, ask and we
+can extend it.)
+
 ## Six gotchas (all lessons learned the hard way)
 
 1. **Forward slashes in JSON paths, not backslashes.** Claude Code's
    hook runner pipes the `command` string through a bash-like shell
-   that interprets `\` as an escape character. `C:\Users\me\.claude\hooks\start.ps1`
-   collapses to `C:Usersme.claudehooksstart.ps1` and the hook silently
-   fails. Use `C:/Users/me/.claude/hooks/start.ps1` — PowerShell `-File`
+   that interprets `\` as an escape character. `C:\Users\me\.claude\hooks\...ps1`
+   collapses to `C:Usersme.claudehooks...ps1` and the hook silently
+   fails. Use `C:/Users/me/.claude/hooks/...ps1` — PowerShell `-File`
    accepts forward slashes fine.
 
 2. **Both `Notification` AND `PermissionRequest` are needed, but
@@ -132,8 +159,8 @@ See `wsl/WSL-SETUP.md`. Short version:
    multi-line PowerShell out of a rendered chat block, use the "Copy
    code" button — click-and-drag selection can turn visual wraps into
    real newlines, which breaks parsing mid-token. Or use short helper
-   functions / dot-sourced files (see `demo/beeps.ps1`) so paste-able
-   lines stay short.
+   functions / dot-sourced files (see the demo `beeps-cb-<PID>.ps1`) so
+   paste-able lines stay short.
 
 6. **`notify.log` is the smoking gun.** If a beep doesn't play, check
    `%USERPROFILE%\.claude\hooks\notify.log`. Timestamp present but no
@@ -177,7 +204,7 @@ by editing that string in `settings.json`, then run `/hooks` or restart
 Claude Code to reload. Reference: matcher list and payload fields from
 Claude Code's official hooks docs (`code.claude.com/docs/en/hooks`).
 
-**Log helps diagnosis.** `notify.ps1` writes each firing to
+**Log helps diagnosis.** `notify-cb-<PID>.ps1` writes each firing to
 `~/.claude/hooks/notify.log` including the `notification_type` and the
 `notification_text` (Claude's human-readable message). If a subtype
 you'd like to beep on isn't in the matcher yet, watch the log during
@@ -186,9 +213,10 @@ normal use — you'll see the exact string to add.
 ## Customizing
 
 - **Sounds:** all beep patterns are `[console]::beep(FREQUENCY_HZ, DURATION_MS)`
-  calls. Edit `notify.ps1` and `stop.ps1` directly — no JSON escaping.
+  calls. Edit `notify-cb-<PID>.ps1` and `stop-cb-<PID>.ps1` directly
+  — no JSON escaping.
 - **Thresholds:** the `15` and `120` seconds are bare numbers in
-  `stop.ps1`. Change them, save, reload hooks.
+  `stop-cb-<PID>.ps1`. Change them, save, reload hooks.
 - **Notification subtypes:** see the section above — edit the `matcher`
   string on the Notification hook in `settings.json`.
 - **Note reference:** C5=523, D5=587, E5=659, F5=698, G5=784, A5=880,
@@ -200,52 +228,63 @@ normal use — you'll see the exact string to add.
 The `Notification`, `PermissionRequest`, `UserPromptSubmit`, and `Stop`
 events can each hold **multiple hook groups** — Claude Code itself adds
 some internal HTTP hooks under those same events. Don't wipe the whole
-event key; remove only the hook groups whose `command` references
-claude-beeps scripts.
+event key; remove only the hook groups whose `command` references this
+project's scripts.
 
-**Fingerprint of a claude-beeps hook:** `type: "command"` where the
-inner `hooks[].command` mentions `notify.ps1`, `start.ps1`, or `stop.ps1`
-(or the `.sh` equivalents on WSL). Anything else in those arrays
-(HTTP hooks, other tools' commands, different paths) belongs to
-something else — leave it alone.
+**Fingerprint of a claude-beeps hook (this project):** `type: "command"`
+where the inner `hooks[].command` mentions `notify-cb-<PID>.ps1`,
+`start-cb-<PID>.ps1`, or `stop-cb-<PID>.ps1` (or the `.sh` equivalents
+on WSL). The uninstaller also matches the legacy pre-GUID names
+(`notify.ps1` / `start.ps1` / `stop.ps1`) for backwards compatibility.
+Anything else in those arrays (HTTP hooks, other projects' hooks with
+different GUIDs, different paths) belongs to something else — leave it
+alone.
 
 **Automated (recommended):**
 
 ```powershell
 # Windows
-powershell -ExecutionPolicy Bypass -File .\windows\uninstall.ps1
+powershell -ExecutionPolicy Bypass -File .\windows\uninstall-cb-88a85f67-1b7d-44ad-b9b3-728d218952bc.ps1
 ```
 ```bash
 # WSL
 bash ./wsl/uninstall.sh
 ```
 
-Both scripts back up `settings.json` first, filter out only the claude-beeps
-hook groups, drop any event key whose array ends up empty, delete the
-`.ps1`/`.sh` scripts and `notify.log`, and validate the resulting JSON.
+The Windows uninstaller reads `PROJECT_ID` at runtime, so if you forked
+and generated a new GUID, the same script uninstalls whatever ID is
+current in `PROJECT_ID`.
+
+Both scripts back up `settings.json` first, filter out only this
+project's hook groups, drop any event key whose array ends up empty,
+delete the matching `.ps1`/`.sh` scripts and `notify.log`, and validate
+the resulting JSON.
 
 **Manual:** edit `~/.claude/settings.json` and for each of the four events:
 
 1. In the event's array, delete the hook group whose inner `command`
-   contains one of our script names.
+   contains one of this project's script names.
 2. If that group was the only entry, remove the event key entirely.
 3. If other groups remain, keep the event key with just those.
 
-Then optionally delete `~/.claude/hooks/{notify,start,stop}.ps1` and
-`~/.claude/hooks/notify.log`.
+Then optionally delete `~/.claude/hooks/notify-cb-<PID>.ps1`,
+`~/.claude/hooks/start-cb-<PID>.ps1`, `~/.claude/hooks/stop-cb-<PID>.ps1`,
+and `~/.claude/hooks/notify.log`.
 
 Restart Claude Code (or run `/hooks` and dismiss) to reload the config.
 
 ## How it works
 
-- `start.ps1` (`UserPromptSubmit` event) writes the current time in
-  ticks to `~/.claude/hooks/start-<session_id>.txt`. Keyed by
+- `start-cb-<PID>.ps1` (`UserPromptSubmit` event) writes the current
+  time in ticks to `~/.claude/hooks/start-<session_id>.txt`. Keyed by
   `session_id` so concurrent Claude Code sessions don't collide.
-- `stop.ps1` (`Stop` event) reads that file, computes elapsed seconds,
-  picks the tier, plays the beeps, and deletes the timestamp file.
-- `notify.ps1` (`Notification` + `PermissionRequest` events) plays the
-  rising chime and appends `{timestamp} {event} [{notification_type}] {notification_text}`
-  to `notify.log`. The `matcher` field on the Notification hook filters
+- `stop-cb-<PID>.ps1` (`Stop` event) reads that file, computes elapsed
+  seconds, picks the tier, plays the beeps, and deletes the timestamp
+  file.
+- `notify-cb-<PID>.ps1` (`Notification` + `PermissionRequest` events)
+  plays the rising chime and appends
+  `{timestamp} {event} [{notification_type}] {notification_text}` to
+  `notify.log`. The `matcher` field on the Notification hook filters
   which subtypes reach this script — Claude Code short-circuits before
   even spawning PowerShell for subtypes that don't match.
 

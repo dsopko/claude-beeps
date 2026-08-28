@@ -1,26 +1,46 @@
 # claude-beeps uninstaller (Windows / PowerShell 5.1+)
 #
-# Removes ONLY the hook groups whose command references our scripts
-# (notify.ps1, start.ps1, stop.ps1). Leaves every other hook group and
-# every other settings key untouched. Safe to run multiple times.
+# Removes ONLY the hook groups whose command references THIS project's
+# scripts. The project id lives in ..\PROJECT_ID at the repo root, and
+# this script looks for files matching:
+#   notify-<PROJECT_ID>.ps1
+#   start-<PROJECT_ID>.ps1
+#   stop-<PROJECT_ID>.ps1
+# Two other claude-beeps installs with different GUIDs stay untouched.
+#
+# Also matches the legacy pre-GUID names (notify.ps1, start.ps1,
+# stop.ps1) so a stale install from an earlier commit still cleans up.
 #
 # What it does:
 #   1. Backs up ~/.claude/settings.json to settings.json.bak-uninstall-<timestamp>
-#   2. Reads the settings, filters out our hook groups from each event
-#   3. Removes any event key whose hooks array ends up empty
-#   4. Writes settings.json back and validates it parses
-#   5. Deletes the three .ps1 files and notify.log from ~/.claude/hooks/
-#      (leaves the hooks directory itself in case other tools use it)
+#   2. Filters out our hook groups from each event; removes now-empty event keys
+#   3. Validates the resulting JSON (restores backup if it fails)
+#   4. Deletes our .ps1 files, notify.log, and stale start-<session>.txt files
+#      from ~/.claude/hooks/ (leaves the directory in case other tools use it)
 #
 # Run:
-#   powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
+#   powershell -ExecutionPolicy Bypass -File .\uninstall-cb-<PROJECT_ID>.ps1
 
 $ErrorActionPreference = 'Stop'
 
+# Read this project's identifier from PROJECT_ID at the repo root
+$projectIdPath = Join-Path $PSScriptRoot '..\PROJECT_ID'
+if (-not (Test-Path $projectIdPath)) {
+    throw "PROJECT_ID not found at $projectIdPath. Cannot determine which scripts belong to this project."
+}
+$projectId = (Get-Content $projectIdPath -Raw).Trim()
+if (-not $projectId) { throw "PROJECT_ID at $projectIdPath is empty." }
+Write-Host "Uninstalling project: $projectId"
+
 $settingsPath = "$env:USERPROFILE\.claude\settings.json"
 $hooksDir     = "$env:USERPROFILE\.claude\hooks"
-$ourScripts   = @('notify.ps1', 'start.ps1', 'stop.ps1')
-$ourEvents    = @('Notification', 'PermissionRequest', 'UserPromptSubmit', 'Stop')
+
+# Filenames belonging to THIS project (plus the legacy pre-GUID names)
+$ourScripts = @(
+    "notify-$projectId.ps1", "start-$projectId.ps1", "stop-$projectId.ps1",
+    'notify.ps1',            'start.ps1',            'stop.ps1'
+)
+$ourEvents  = @('Notification', 'PermissionRequest', 'UserPromptSubmit', 'Stop')
 
 if (-not (Test-Path $settingsPath)) {
     Write-Host "No settings.json at $settingsPath - nothing to uninstall."
@@ -70,16 +90,13 @@ if (HasProperty $data 'hooks') {
             $data.hooks.$evt = $after
         }
     }
-    # If hooks object is now completely empty, remove it entirely
     if (@($data.hooks.PSObject.Properties).Count -eq 0) {
         $data.PSObject.Properties.Remove('hooks')
     }
 }
 
-# Write back with pretty formatting
 $data | ConvertTo-Json -Depth 20 | Set-Content -Path $settingsPath -Encoding UTF8
 
-# Validate
 try {
     Get-Content $settingsPath -Raw | ConvertFrom-Json | Out-Null
     Write-Host "settings.json parses OK after uninstall."
@@ -94,7 +111,6 @@ if ($removedEvents.Count -gt 0) {
     Write-Host "Removed now-empty event keys: $($removedEvents -join ', ')"
 }
 
-# Remove hook scripts and log
 foreach ($f in ($ourScripts + @('notify.log'))) {
     $p = Join-Path $hooksDir $f
     if (Test-Path $p) {
@@ -102,7 +118,6 @@ foreach ($f in ($ourScripts + @('notify.log'))) {
         Write-Host "Deleted $p"
     }
 }
-# Best-effort: remove any leftover start-<session>.txt timestamps
 Get-ChildItem $hooksDir -Filter 'start-*.txt' -ErrorAction SilentlyContinue | ForEach-Object {
     Remove-Item $_.FullName -Force
     Write-Host "Deleted $($_.FullName)"
