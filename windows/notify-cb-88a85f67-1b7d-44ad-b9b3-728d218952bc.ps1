@@ -1,6 +1,10 @@
 # Notification + PermissionRequest hook - plays the "needs input" rising chime.
 # Also logs the event name, notification_type (only present on Notification), and
 # notification_text (Claude's human-readable message) for future diagnosis.
+# Non-Windows guard: when installed as a plugin this fires on every OS,
+# so exit quietly (0 = no hook-error notice) where there is no beep API.
+if ($env:OS -ne 'Windows_NT') { exit 0 }
+
 $evt = "unknown"
 $type = ""
 $text = ""

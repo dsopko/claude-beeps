@@ -1,0 +1,12 @@
+{
+  "name": "claude-beeps",
+  "displayName": "Claude Beeps",
+  "version": "1.0.0",
+  "description": "Audible chimes for Claude Code on Windows: a rising tone when Claude needs input, and a duration-tiered done sound when a turn finishes. Windows only - the hooks exit quietly elsewhere.",
+  "author": {
+    "name": "David Sopko"
+  },
+  "repository": "https://github.com/dsopko/claude-beeps",
+  "license": "MIT",
+  "keywords": ["hooks", "notification", "sound", "windows"]
+}
