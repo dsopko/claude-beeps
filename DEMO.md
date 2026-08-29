@@ -217,16 +217,24 @@ Optionally offer either path:
 
 ## Notes
 
-- `Notification` events for `AskUserQuestion` don't reliably fire the
-  installed hook (Claude Code doesn't route the internal
-  `agent_needs_input` from AskUserQuestion the same way it does other
-  in-app notifications). That's why Step 1 in Path A plays the chime
-  manually through the installed hook — it's the closest honest
-  simulation of the real experience.
+- **AskUserQuestion does fire the Notification hook.** Verified on
+  Claude Code v2.1.250: an `AskUserQuestion` call raises a
+  `Notification` event with `notification_type: agent_needs_input`,
+  and `notify.log` records it. Earlier drafts of this file claimed
+  the opposite — that was wrong. That means in Path A, the natural
+  firing of the hook at Step 4 (when the AskUserQuestion appears)
+  will play the chime *again* on top of the Step 1 manual play, so
+  the user hears it twice — separated by however long the Step 2/3
+  explanation and table take to read. Not a bug: the second firing
+  proves the whole hook chain works during real interactive use, not
+  just via pipe-tests. If it feels noisy, drop the Step 1 manual
+  play and rewrite Step 2's explanation in future tense
+  ("You'll hear the chime when I ask you the next question")
+  instead of past tense.
 - Real `PermissionRequest` events (Claude asking to run a
-  non-allowlisted tool) do fire the hook reliably. If the user wants
-  to see a real permission-triggered chime, run any tool that isn't in
-  their `permissions.allow` list.
+  non-allowlisted tool) also fire the hook reliably. If the user
+  wants to hear a permission-triggered chime, run any tool that
+  isn't in their `permissions.allow` list.
 - Path A leaves no lingering state: `stop-<PID>.ps1` deletes its own
   timestamp file, and the fake `session_id`s used here never collide
   with the current Claude Code session's id.
