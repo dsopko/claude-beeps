@@ -8,12 +8,16 @@
 #   stop-<PROJECT_ID>.ps1
 # Two other claude-beeps installs with different GUIDs stay untouched.
 #
-# Also matches the legacy pre-GUID names (notify.ps1, start.ps1,
-# stop.ps1) so a stale install from an earlier commit still cleans up.
+# Also matches the anchored legacy pattern
+#   \.claude[/\\]hooks[/\\](notify|start|stop)\.ps1
+# so a stale pre-GUID install still cleans up. Anchoring to
+# .claude/hooks/ prevents false positives on third-party hooks whose
+# command merely ends with notify.ps1, start.ps1, or stop.ps1
+# (e.g. restart.ps1, slack-notify.ps1) - such hooks are never touched.
 #
 # What it does:
 #   1. Backs up ~/.claude/settings.json to settings.json.bak-uninstall-<timestamp>
-#   2. Filters out our hook groups from each event; removes now-empty event keys
+#   2. Prints and removes each matching hook group; drops now-empty event keys
 #   3. Validates the resulting JSON (restores backup if it fails)
 #   4. Deletes our .ps1 files, notify.log, and stale start-<session>.txt files
 #      from ~/.claude/hooks/ (leaves the directory in case other tools use it)
@@ -35,12 +39,24 @@ Write-Host "Uninstalling project: $projectId"
 $settingsPath = "$env:USERPROFILE\.claude\settings.json"
 $hooksDir     = "$env:USERPROFILE\.claude\hooks"
 
-# Filenames belonging to THIS project (plus the legacy pre-GUID names)
-$ourScripts = @(
+# Match patterns: exact GUID names (escaped) plus one anchored legacy regex.
+# Substring semantics on the GUID names are safe because the hyphen and full
+# UUID keep them from matching anything else. The legacy entry is anchored
+# to the Claude hooks directory to prevent third-party false positives.
+$ourPatterns = @(
+    [regex]::Escape("notify-$projectId.ps1"),
+    [regex]::Escape("start-$projectId.ps1"),
+    [regex]::Escape("stop-$projectId.ps1"),
+    '\.claude[/\\]hooks[/\\](notify|start|stop)\.ps1'
+)
+
+# Exact filenames to delete from ~/.claude/hooks/ - the bare legacy names
+# are safe here because we're only touching files inside our hooks dir.
+$ourFiles = @(
     "notify-$projectId.ps1", "start-$projectId.ps1", "stop-$projectId.ps1",
     'notify.ps1',            'start.ps1',            'stop.ps1'
 )
-$ourEvents  = @('Notification', 'PermissionRequest', 'UserPromptSubmit', 'Stop')
+$ourEvents = @('Notification', 'PermissionRequest', 'UserPromptSubmit', 'Stop')
 
 if (-not (Test-Path $settingsPath)) {
     Write-Host "No settings.json at $settingsPath - nothing to uninstall."
@@ -55,13 +71,21 @@ Write-Host "Backed up settings.json -> $backup"
 
 $data = Get-Content $settingsPath -Raw | ConvertFrom-Json
 
+function Get-GroupCommand { param($group)
+    if (-not $group.hooks) { return $null }
+    foreach ($h in $group.hooks) {
+        if ($h.type -eq 'command' -and $h.command) { return $h.command }
+    }
+    return $null
+}
+
 function Test-IsOurGroup {
     param($group)
     if (-not $group.hooks) { return $false }
     foreach ($h in $group.hooks) {
         if ($h.type -eq 'command' -and $h.command) {
-            foreach ($script in $ourScripts) {
-                if ($h.command -match [regex]::Escape($script)) { return $true }
+            foreach ($pattern in $ourPatterns) {
+                if ($h.command -match $pattern) { return $true }
             }
         }
     }
@@ -81,8 +105,16 @@ if (HasProperty $data 'hooks') {
     foreach ($evt in $ourEvents) {
         if (-not (HasProperty $data.hooks $evt)) { continue }
         $before = @($data.hooks.$evt)
-        $after  = @($before | Where-Object { -not (Test-IsOurGroup $_) })
-        $removedGroups += ($before.Count - $after.Count)
+        $after  = @()
+        foreach ($grp in $before) {
+            if (Test-IsOurGroup $grp) {
+                $cmd = Get-GroupCommand $grp
+                Write-Host "Removing $evt hook group: $cmd"
+                $removedGroups++
+            } else {
+                $after += $grp
+            }
+        }
         if ($after.Count -eq 0) {
             $data.hooks.PSObject.Properties.Remove($evt)
             $removedEvents += $evt
@@ -111,7 +143,7 @@ if ($removedEvents.Count -gt 0) {
     Write-Host "Removed now-empty event keys: $($removedEvents -join ', ')"
 }
 
-foreach ($f in ($ourScripts + @('notify.log'))) {
+foreach ($f in ($ourFiles + @('notify.log'))) {
     $p = Join-Path $hooksDir $f
     if (Test-Path $p) {
         Remove-Item $p -Force

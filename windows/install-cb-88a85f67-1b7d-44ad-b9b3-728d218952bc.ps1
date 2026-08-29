@@ -5,12 +5,18 @@
 #   2. Backs up ~/.claude/settings.json (if any) to
 #      settings.json.bak-install-<timestamp>.
 #   3. Copies notify/start/stop scripts from windows/ to ~/.claude/hooks/.
-#   4. Merges the hooks block from settings-hooks-fragment.json into
+#   4. One-time legacy migration - triggered only when
+#      ~/.claude/hooks/{notify,start,stop}.ps1 exist as files. Removes hook
+#      groups whose command matches the anchored pattern
+#      \.claude[/\\]hooks[/\\](notify|start|stop)\.ps1 on the four managed
+#      events, deletes those legacy files, and announces both.
+#   5. Merges the hooks block from settings-hooks-fragment.json into
 #      ~/.claude/settings.json, substituting <USERNAME> with $env:USERNAME
 #      and preserving all other top-level settings and existing hook
-#      groups on the same events.
-#   5. Validates the resulting JSON (restores backup on failure).
-#   6. Reports what changed. Current Claude Code picks the new hook
+#      groups on the same events. Replaces (with a printed message) any
+#      pre-existing hook group belonging to THIS PROJECT_ID.
+#   6. Validates the resulting JSON (restores backup on failure).
+#   7. Reports what changed. Current Claude Code picks the new hook
 #      groups up on its own within seconds; no restart or /hooks reload
 #      is issued here, and none is normally needed.
 #
@@ -87,6 +93,7 @@ if (Test-Path $settingsPath) {
 }
 
 # Back up first (only if settings.json exists)
+$backup = $null
 if ((Test-Path $settingsPath) -and -not $DryRun) {
     $stamp  = Get-Date -Format 'yyyyMMdd-HHmmss'
     $backup = "$settingsPath.bak-install-$stamp"
@@ -104,20 +111,74 @@ function Set-Property { param($obj, [string]$name, $value)
     else { $obj | Add-Member -MemberType NoteProperty -Name $name -Value $value -Force }
 }
 
+function Get-GroupCommand { param($group)
+    if (-not $group.hooks) { return $null }
+    foreach ($h in $group.hooks) {
+        if ($h.type -eq 'command' -and $h.command) { return $h.command }
+    }
+    return $null
+}
+
+$ourGuidPattern = @(
+    [regex]::Escape("notify-$projectId.ps1"),
+    [regex]::Escape("start-$projectId.ps1"),
+    [regex]::Escape("stop-$projectId.ps1")
+) -join '|'
+
 function Test-IsOurHookGroup {
-    param($group, [string]$projectId)
+    param($group, [string]$pattern)
     if (-not $group.hooks) { return $false }
     foreach ($h in $group.hooks) {
-        if ($h.type -eq 'command' -and $h.command) {
-            if ($h.command -match "notify-$projectId\.ps1|start-$projectId\.ps1|stop-$projectId\.ps1|notify\.ps1|start\.ps1|stop\.ps1") {
-                return $true
-            }
+        if ($h.type -eq 'command' -and $h.command -and ($h.command -match $pattern)) {
+            return $true
         }
     }
     return $false
 }
 
-# Merge hooks
+$ourEvents = @('Notification', 'PermissionRequest', 'UserPromptSubmit', 'Stop')
+
+# --- One-time legacy migration ---
+# Gated on file existence: only runs when pre-1.0 bare-name scripts sit
+# in ~/.claude/hooks/. The pattern is anchored to that directory so a
+# stray restart.ps1 or slack-notify.ps1 elsewhere cannot match.
+$legacyBareNames = @('notify.ps1', 'start.ps1', 'stop.ps1')
+$legacyFiles     = $legacyBareNames | ForEach-Object { Join-Path $hooksDir $_ }
+$legacyPresent   = @($legacyFiles | Where-Object { Test-Path $_ })
+$legacyPathPattern = '\.claude[/\\]hooks[/\\](notify|start|stop)\.ps1'
+
+if ($legacyPresent.Count -gt 0) {
+    Write-Host "Found pre-1.0 claude-beeps install - migrating."
+    if (HasProperty $existing 'hooks') {
+        foreach ($evt in $ourEvents) {
+            if (-not (HasProperty $existing.hooks $evt)) { continue }
+            $before  = @($existing.hooks.$evt)
+            $keepers = @()
+            foreach ($grp in $before) {
+                if (Test-IsOurHookGroup $grp $legacyPathPattern) {
+                    $cmd = Get-GroupCommand $grp
+                    if ($DryRun) { Write-Host "[DRY RUN] would migrate legacy hook group ($evt): $cmd" }
+                    else        { Write-Host "Migrating legacy hook group ($evt): $cmd" }
+                } else {
+                    $keepers += $grp
+                }
+            }
+            if (-not $DryRun) {
+                if ($keepers.Count -eq 0) {
+                    $existing.hooks.PSObject.Properties.Remove($evt)
+                } else {
+                    $existing.hooks.$evt = $keepers
+                }
+            }
+        }
+    }
+    foreach ($f in $legacyPresent) {
+        if ($DryRun) { Write-Host "[DRY RUN] would delete legacy file: $f" }
+        else        { Remove-Item $f -Force; Write-Host "Deleted legacy file: $f" }
+    }
+}
+
+# --- Merge this project's hooks ---
 if (-not (HasProperty $existing 'hooks')) {
     Set-Property $existing 'hooks' ([pscustomobject]@{})
 }
@@ -130,9 +191,15 @@ foreach ($p in $fragHooks.PSObject.Properties) {
     $ourGroups  = @($p.Value)
     if (HasProperty $targetHooks $evt) {
         $existingGroups = @($targetHooks.$evt)
-        # Drop any pre-existing claude-beeps groups for this project id
-        # (or legacy pre-GUID groups) so re-runs don't stack duplicates.
-        $kept = @($existingGroups | Where-Object { -not (Test-IsOurHookGroup $_ $projectId) })
+        $kept = @()
+        foreach ($grp in $existingGroups) {
+            if (Test-IsOurHookGroup $grp $ourGuidPattern) {
+                $cmd = Get-GroupCommand $grp
+                Write-Host "Replacing existing claude-beeps hook group ($evt): $cmd"
+            } else {
+                $kept += $grp
+            }
+        }
         $merged = @($kept + $ourGroups)
         $targetHooks.$evt = $merged
     } else {

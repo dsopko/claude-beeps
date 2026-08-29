@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # claude-beeps uninstaller (WSL / bash)
 #
-# Removes ONLY the hook groups whose command references our scripts
-# (notify.sh, start.sh, stop.sh). Leaves every other hook group and
-# every other settings key untouched. Safe to run multiple times.
+# Removes ONLY the hook groups whose command references our scripts,
+# and only when the command path resolves inside ~/.claude/hooks/.
+# The jq filter is anchored to \.claude/hooks/(notify|start|stop)\.sh
+# so third-party hooks whose command merely ends with notify.sh, start.sh,
+# or stop.sh (e.g. restart.sh, slack-notify.sh) are never touched.
+# Leaves every other hook group and every other settings key untouched.
+# Safe to run multiple times.
 #
 # Requires: jq
 # Run: bash ./uninstall.sh
@@ -12,6 +16,8 @@ set -euo pipefail
 
 SETTINGS="$HOME/.claude/settings.json"
 HOOKS_DIR="$HOME/.claude/hooks"
+PATTERN='\.claude/hooks/(notify|start|stop)\.sh'
+EVENTS='Notification PermissionRequest UserPromptSubmit Stop'
 
 if [ ! -f "$SETTINGS" ]; then
     echo "No settings.json at $SETTINGS - nothing to uninstall."
@@ -28,17 +34,30 @@ BACKUP="$SETTINGS.bak-uninstall-$STAMP"
 cp "$SETTINGS" "$BACKUP"
 echo "Backed up settings.json -> $BACKUP"
 
-# jq filter:
-#   For each of our target events, filter its hook groups to keep only those
-#   whose inner hooks[].command does NOT reference any of our script names.
-#   If the resulting array is empty, remove the event key entirely.
-#   If the whole .hooks object ends up empty, remove it too.
+# First pass: list each hook group about to be removed with its command
+# and event name, so the removal is never silent.
+for evt in $EVENTS; do
+    jq -r --arg evt "$evt" --arg pat "$PATTERN" '
+        def is_ours(g):
+          (g.hooks // []) | any(
+            .type == "command"
+            and (.command // "" | test($pat))
+          );
+
+        (.hooks[$evt] // [])
+        | map(select(is_ours(.)))
+        | .[]
+        | (.hooks[] | select(.type == "command") | "Removing " + $evt + " hook group: " + .command)
+    ' "$SETTINGS"
+done
+
+# Second pass: rewrite the settings with the matching groups removed.
 tmp=$(mktemp)
-jq '
+jq --arg pat "$PATTERN" '
     def is_ours(g):
       (g.hooks // []) | any(
         .type == "command"
-        and (.command // "" | test("notify\\.sh|start\\.sh|stop\\.sh"))
+        and (.command // "" | test($pat))
       );
 
     def clean_event(e):
@@ -81,5 +100,6 @@ for f in "$HOOKS_DIR"/start-*.txt; do
 done
 
 echo ""
-echo "Done. Restart Claude Code (or run /hooks once) so the change takes effect."
+echo "Done. The removal normally takes effect within seconds."
+echo "If the beeps outlive it, run /hooks once (dismiss the dialog) or restart Claude Code."
 echo "Backup preserved at: $BACKUP"
