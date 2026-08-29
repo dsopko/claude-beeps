@@ -1,9 +1,15 @@
 # Notification + PermissionRequest hook - plays the "needs input" rising chime.
 # Also logs the event name, notification_type (only present on Notification), and
 # notification_text (Claude's human-readable message) for future diagnosis.
-# Non-Windows guard: when installed as a plugin this fires on every OS,
-# so exit quietly (0 = no hook-error notice) where there is no beep API.
+#
+# Non-Windows guard: plugin hooks fire on every OS (there is no platform
+# gating in the plugin system), so exit quietly where there is no beep API.
 if ($env:OS -ne 'Windows_NT') { exit 0 }
+
+# State/log dir: the hook runner exports CLAUDE_PLUGIN_DATA (survives plugin
+# updates). Direct pipe-tests don't have it - fall back to the legacy dir.
+$dataDir = if ($env:CLAUDE_PLUGIN_DATA) { $env:CLAUDE_PLUGIN_DATA } else { "$env:USERPROFILE\.claude\hooks" }
+New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
 $evt = "unknown"
 $type = ""
@@ -17,7 +23,7 @@ try {
 
 $typePart = if ($type) { "[$type] " } else { "" }
 "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $evt $typePart$text" |
-    Out-File -Append -Encoding ascii "$env:USERPROFILE\.claude\hooks\notify.log"
+    Out-File -Append -Encoding ascii "$dataDir\notify.log"
 
 [console]::beep(1200,150)
 [console]::beep(1500,200)

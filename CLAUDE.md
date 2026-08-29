@@ -1,119 +1,130 @@
 # claude-beeps — operating manual for Claude Code
 
-This folder is a set of Claude Code hooks that play audible chimes:
-a rising tone when Claude needs input, and a duration-tiered "done"
+This repo is a Claude Code **plugin** that plays audible chimes: a
+rising tone when Claude needs input, and a duration-tiered "done"
 sound when a turn finishes. See README.md for the human-facing pitch;
 this file tells you (Claude) how to behave when a user runs a session
 in this directory.
 
+The repo root is the plugin root: `.claude-plugin/plugin.json` is the
+manifest, `hooks/hooks.json` registers the hooks, `scripts/*.ps1` are
+the hook bodies. The repo doubles as its own marketplace via
+`.claude-plugin/marketplace.json`. There is no installer — the plugin
+system is the installer. Nothing in this project ever writes to the
+user's `settings.json`.
+
 ## Install mode detection
 
-Read `PROJECT_ID` at the repo root. Its content (something like
-`cb-<uuid>`) is this project's identifier. The three hook scripts
-installed to `~/.claude/hooks/` are named `notify-<PROJECT_ID>.ps1`,
-`start-<PROJECT_ID>.ps1`, and `stop-<PROJECT_ID>.ps1`.
+Check whether the plugin is installed:
 
-**You are in install mode when `~/.claude/hooks/notify-<PROJECT_ID>.ps1`
-does not exist.** Your first move in install mode: read **SETUP.md**
-and run the install interview. Don't offer to do anything else until
-the install is complete or the user declines it.
+```
+claude plugin list 2>$null | Select-String claude-beeps
+```
 
-**You are in operating mode when that file exists.** Greet in one
-line, note the installed project id, and ask what the user wants —
-common answers include:
+(or on any platform: `claude plugin list` and look for `claude-beeps`;
+the plugin cache at `~/.claude/plugins/cache/claude-beeps/` existing is
+corroborating evidence, not proof of *enabled*.)
 
-- **"Reinstall"** or **"update the installed files"** — re-run
-  `windows/install-<PROJECT_ID>.ps1`. Idempotent; overwrites the three
-  hook scripts and refreshes the settings.json hook groups without
-  clobbering unrelated hooks. The change is normally picked up within
-  seconds — `/hooks` is only needed if it isn't (see rule 4).
-- **"Uninstall"**, **"remove"**, or **"start clean"** — run
-  `windows/uninstall-<PROJECT_ID>.ps1`. It backs up settings.json,
-  filters out only this project's hook groups, deletes the three hook
-  scripts and `notify.log`, and validates the result. The removal is
-  normally picked up within seconds — `/hooks` is only needed if it
-  isn't (see rule 4).
-- **"Change the sounds / thresholds / matcher"** — edit the source
-  files under `windows/` first, then reinstall to sync. Sound patterns
-  are `[console]::beep(HZ, MS)`; thresholds `15` and `120` are bare
-  numbers in `stop-<PROJECT_ID>.ps1`; the Notification matcher lives
-  in `settings-hooks-fragment.json` and gets copied into the user's
-  settings.json on install.
-- **"What changed?"** — diff installed vs source: the source-of-truth
-  file is the settings-hooks-fragment.json plus the three hook scripts
-  under `windows/`. Compare against `~/.claude/hooks/notify-<PROJECT_ID>.ps1`
-  etc. and the hook groups in `~/.claude/settings.json`.
-- **"Demo the beeps"**, **"play the sounds"**, **"show me what it
-  sounds like"** — read **DEMO.md** and follow it exactly. It plays
-  the notification chime and the three finish-sound tiers through the
-  installed hooks, with a continue/quit prompt in the middle. Don't
-  paraphrase the runbook into a shorter version; the pacing and the
-  on-screen text were tuned to line up with the audio.
+**Install mode — not installed:** read **SETUP.md** and run the install
+interview. Don't offer to do anything else until the install is
+complete or the user declines it.
+
+**Operating mode — installed:** greet in one line and ask what the
+user wants — common answers include:
+
+- **"Update"** or **"reinstall"** — `/plugin marketplace update
+  claude-beeps`, then `/reload-plugins`. Users only receive a new
+  version when `version` in `.claude-plugin/plugin.json` was bumped.
+- **"Uninstall"**, **"remove"**, or **"start clean"** —
+  `/plugin uninstall claude-beeps@claude-beeps`. Nothing else to clean
+  up; optionally delete the plugin data dir
+  (`~/.claude/plugins/data/<id>/` — holds `notify.log` and any
+  leftover `start-*.txt`).
+- **"Change the sounds / thresholds / matcher"** — edit the source:
+  sound patterns are `[console]::beep(HZ, MS)` calls in
+  `scripts/notify.ps1` and `scripts/stop.ps1`; thresholds `15` and
+  `120` are bare numbers in `scripts/stop.ps1`; the Notification
+  matcher lives in `hooks/hooks.json`. Then ship it: bump `version` in
+  `.claude-plugin/plugin.json`, `/plugin marketplace update
+  claude-beeps`, `/reload-plugins`. For rapid iteration suggest
+  `claude --plugin-dir <this repo>` instead.
+- **"What changed?"** — diff this repo against the installed copy
+  under `~/.claude/plugins/cache/claude-beeps/claude-beeps/<version>/`.
+- **"Demo the beeps"**, **"play the sounds"** — read **DEMO.md** and
+  follow it exactly. Don't paraphrase the runbook into a shorter
+  version; the pacing and the on-screen text were tuned to line up
+  with the audio.
 
 ## Rules
 
-1. **Never edit `~/.claude/settings.json` without first backing it up.**
-   The install and uninstall scripts do this automatically. If you're
-   doing surgery by hand, `Copy-Item ... settings.json.bak-<timestamp>`
-   before writing.
-2. **Never wipe entire hook event keys.** Each of `Notification`,
-   `PermissionRequest`, `UserPromptSubmit`, and `Stop` may hold
-   multiple hook groups — Claude Code itself adds internal HTTP hooks
-   at `http://127.0.0.1:52888/hook` to some of these events. Only
-   touch groups whose command references this project's script names.
-3. **Never write backslashes in JSON `command` paths.** The hook
-   runner passes commands through a bash-like shell that eats `\` as
-   escape chars — use forward slashes (`C:/Users/...`). PowerShell
-   `-File` accepts both.
-4. **Never claim the beep is live without evidence — and never claim
-   it isn't, either.** Claude Code v2.1.250 *does* pick up settings.json
-   hook changes mid-session, within seconds of the write, with no
-   `/hooks` and no restart (verified 2026-08-28). Older versions may
-   not, so don't assert either way from memory. Check for one of:
-   - a line in `~/.claude/hooks/notify.log` that you did **not** pipe
-     in yourself — a real `PermissionRequest` or `Notification` entry
-   - `~/.claude/hooks/start-<current session_id>.txt` appearing after
+1. **Never edit the installed copy** under `~/.claude/plugins/cache/`.
+   It is replaced wholesale on every plugin update. All changes go in
+   this repo, then reach the install via a version bump + marketplace
+   update (or `--plugin-dir` during development).
+2. **Never write to `~/.claude/settings.json` on this project's
+   behalf.** The plugin system owns registration: Claude Code records
+   an `enabledPlugins` entry itself at install time. If a legacy
+   (pre-plugin) claude-beeps install is present — hook groups in
+   settings.json referencing `notify-cb-*.ps1` / `start-cb-*.ps1` /
+   `stop-cb-*.ps1`, or bare `notify.ps1` etc. under
+   `~/.claude/hooks/` — tell the user, and only with their approval
+   remove *those specific hook groups* (backup first, never wipe whole
+   event keys; Claude Code adds its own internal hooks under the same
+   events).
+3. **Never claim the beep is live without evidence — and never claim
+   it isn't, either.** Pipe-testing the `.ps1` files or playing the
+   demo proves only that the scripts run and the audio device works —
+   it says nothing about whether the plugin's hooks are registered.
+   Real evidence, either one:
+   - a line in the plugin's `notify.log` (under
+     `~/.claude/plugins/data/<id>/`) that you did **not** pipe in
+     yourself — a real `PermissionRequest` or `Notification` entry
+   - `start-<current session_id>.txt` appearing in that data dir after
      the user submits a prompt (written by the `UserPromptSubmit` hook)
 
-   Either one proves the hook runner loaded the config. Beeps you
-   produced by piping JSON into the `.ps1` files yourself prove only
-   that the scripts run and the audio device works — they say nothing
-   about whether the hooks are registered, so never cite the install
-   verify or the demo as evidence of liveness. If neither signal shows
-   up after a full turn, *then* have the user run `/hooks` (dismiss the
-   menu — that reloads) or restart claude.
-5. **Match the Notification hook's `matcher` field to the recommended
+   If neither signal shows up after a full turn, have the user run
+   `/reload-plugins`, or restart claude.
+4. **Match the Notification hook's `matcher` field to the recommended
    set** unless the user asks otherwise: `agent_needs_input|elicitation_dialog|elicitation_url_dialog|quota_auto_resume_stale|quota_auto_resume_disabled`.
    Firing on every subtype means a ~60s idle-prompt nag after every
    turn and a double-beep on permission events. Details in README's
    "Notification subtype filtering" section.
-6. **Bypass-permissions mode kills `PermissionRequest`.** If the user
+5. **Bypass-permissions mode kills `PermissionRequest`.** If the user
    uses `--dangerously-skip-permissions` or accepted bypass mode, they
    won't hear the chime on permission prompts — it's not a bug and
    don't try to "fix" it.
+6. **Keep the non-Windows guard.** Plugin hooks fire on every OS
+   (there is no platform gating in the plugin system), so every script
+   in `scripts/` opens with `if ($env:OS -ne 'Windows_NT') { exit 0 }`.
+   Never remove it, and add it to any new hook script.
 
 ## Scripts
 
 | Task | Command |
 |---|---|
-| Install / reinstall this project's hooks | `powershell -ExecutionPolicy Bypass -File .\windows\install-<PROJECT_ID>.ps1` |
-| Preview install without writing | add `-DryRun` |
-| Uninstall this project's hooks | `powershell -ExecutionPolicy Bypass -File .\windows\uninstall-<PROJECT_ID>.ps1` |
-| Pipe-test the installed notify hook | `'{"session_id":"t","hook_event_name":"Notification","notification_type":"agent_needs_input","notification_text":"test"}' \| powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\notify-<PROJECT_ID>.ps1"` |
-
-Replace `<PROJECT_ID>` with the value in `PROJECT_ID`.
+| Validate the plugin + marketplace manifests | `claude plugin validate .` |
+| Load the working copy without installing | `claude --plugin-dir <this repo>` |
+| Pipe-test the notify hook (repo copy) | `'{"session_id":"t","hook_event_name":"Notification","notification_type":"agent_needs_input","notification_text":"test"}' \| powershell -ExecutionPolicy Bypass -File .\scripts\notify.ps1` |
+| Update an install after a version bump | `/plugin marketplace update claude-beeps` then `/reload-plugins` |
+| Uninstall | `/plugin uninstall claude-beeps@claude-beeps` |
 
 ## Files
 
-- `PROJECT_ID` — the identifier. Change here first, then rename the
-  five ps1 files and update settings-hooks-fragment.json to match.
+- `.claude-plugin/plugin.json` — manifest; bump `version` to ship any
+  change to installed users.
+- `.claude-plugin/marketplace.json` — makes the repo installable via
+  `/plugin marketplace add dsopko/claude-beeps`.
+- `hooks/hooks.json` — the four hook registrations, exec form
+  (`command` + `args`, no shell), paths via `${CLAUDE_PLUGIN_ROOT}`.
+- `scripts/` — the three hook bodies. State and log go to
+  `${CLAUDE_PLUGIN_DATA}` (survives updates); fallback
+  `~/.claude/hooks/` when run outside the hook runner.
 - `README.md` — human-facing overview.
-- `SETUP.md` — install runbook (this is what you follow in install mode).
-- `DEMO.md` — demo runbook (this is what you follow when the user
-  asks to hear the sounds).
-- `windows/` — hook scripts, install/uninstall scripts, settings fragment.
-- `wsl/` — bash equivalents for running Claude Code inside WSL. Not
-  auto-installed by the Windows installer; see `wsl/WSL-SETUP.md`.
-- `demo/beeps-<PROJECT_ID>.ps1` — standalone dot-source demo of the
-  named sounds (Triumphant, BellTower, Arpeggio, CallResp). Never
-  invoked by the hooks; purely a listening tool for the user.
+- `SETUP.md` — install runbook (follow in install mode).
+- `DEMO.md` — demo runbook (follow when the user asks to hear the
+  sounds).
+- `demo/beeps.ps1` — standalone dot-source demo of the named sounds
+  (Triumphant, BellTower, Arpeggio, CallResp). Never invoked by the
+  hooks; purely a listening tool for the user.
+- `.claude/skills/commit-messages/` — commit-message style for
+  developing this repo; not a plugin component.

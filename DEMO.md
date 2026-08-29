@@ -4,158 +4,35 @@
 > beeps" / "play the sounds" / "show me what claude-beeps sounds like".
 > Claude reads this file and runs the demo below.
 
-This runbook is for **Claude**. It has two paths — pick one based on
-whether the hooks are installed on this machine, then follow it end to
-end. Do not paraphrase the on-screen text into a shorter version; the
-pacing and the text were tuned to line up with the audio.
+This runbook is for **Claude**. Follow it end to end. Do not
+paraphrase the on-screen text into a shorter version; the pacing and
+the text were tuned to line up with the audio.
+
+All sounds play by piping fake hook JSON into the `.ps1` files under
+`scripts/` in this repo. That works whether or not the plugin is
+installed — the repo copy and the installed cache copy are the same
+scripts. Install state changes only the wrap-up (Step 7): when the
+plugin is installed, a real fourth sound fires at end-of-turn.
 
 ## Step 0 — Detect install state
 
 ```powershell
-$pid_ = (Get-Content .\PROJECT_ID -Raw).Trim()
-$installed = Test-Path "$env:USERPROFILE\.claude\hooks\notify-$pid_.ps1"
+$installed = [bool](claude plugin list 2>$null | Select-String 'claude-beeps')
 ```
 
-Then branch:
+Announce it in one line of your response ("The plugin is installed —
+you'll get a real end-of-turn chime as a bonus fourth sound" or "The
+plugin isn't installed — you'll hear the three demo tiers only").
 
-- **`$installed` is true → Path A (installed).** Play via the actual
-  installed hooks. Proves the whole chain works and leaves entries in
-  `notify.log` you can look at afterwards.
-- **`$installed` is false → Path B (not installed).** Play the beep
-  sequences directly, sourced from the `.ps1` files in `windows/`.
-  No hook-directory writes, no log entries, no side effects. Same
-  audio as Path A because the sequences come from the same source.
+Run every command below from the repo root.
 
-Announce which path you're taking in one line of your response
-("Hooks are installed — playing through them" or "Hooks aren't
-installed here — playing the sounds directly from the source files").
-
-The Step 2–5 on-screen text is **identical** for both paths — same
-explanation, same table, same continue/quit question. Only Step 1
-(how you play notify) and Steps 5/6 (how you play the tiers) differ.
-
----
-
-## Path A — Installed
-
-### Step 1 (A) — Play notify through the installed hook
+## Step 1 — Play the notify chime
 
 ```powershell
-$pid_ = (Get-Content .\PROJECT_ID -Raw).Trim()
-$hooksDir = "$env:USERPROFILE\.claude\hooks"
-'{"session_id":"demo","hook_event_name":"Notification","notification_type":"agent_needs_input","notification_text":"claude-beeps demo starting"}' | powershell -ExecutionPolicy Bypass -File "$hooksDir\notify-$pid_.ps1"
+'{"session_id":"demo","hook_event_name":"Notification","notification_type":"agent_needs_input","notification_text":"claude-beeps demo starting"}' | powershell -ExecutionPolicy Bypass -File .\scripts\notify.ps1
 ```
 
-### Step 5 (A) — Continuation intent
-
-Print exactly this if the user chose "Continue":
-
-> Continuing. Playing all three finish sounds through the installed
-> `stop-cb-<PID>.ps1` hook — plus the final "done" sound for this turn
-> itself, which will fire naturally at end-of-turn based on how long
-> the whole conversation has been running.
-
-They'll hear four sounds total: the three demo tiers plus the real
-`Stop` event when your response ends.
-
-### Step 6 (A) — Play the three tiers through the installed hook
-
-```powershell
-$pid_ = (Get-Content .\PROJECT_ID -Raw).Trim()
-$hooksDir = "$env:USERPROFILE\.claude\hooks"
-
-Write-Host ""
-Write-Host ">>> [1/3] SHORT - under 15 seconds - 2 beeps"
-"$((Get-Date).Ticks)" | Set-Content -Encoding ascii -NoNewline "$hooksDir\start-demo-short.txt"
-'{"session_id":"demo-short"}' | powershell -ExecutionPolicy Bypass -File "$hooksDir\stop-$pid_.ps1"
-Start-Sleep -Milliseconds 900
-
-Write-Host ""
-Write-Host ">>> [2/3] NORMAL - 15 seconds to 2 minutes - 4 beeps"
-"$(((Get-Date).AddSeconds(-30)).Ticks)" | Set-Content -Encoding ascii -NoNewline "$hooksDir\start-demo-normal.txt"
-'{"session_id":"demo-normal"}' | powershell -ExecutionPolicy Bypass -File "$hooksDir\stop-$pid_.ps1"
-Start-Sleep -Milliseconds 900
-
-Write-Host ""
-Write-Host ">>> [3/3] LONG - over 2 minutes - 13-beep cascade"
-"$(((Get-Date).AddSeconds(-180)).Ticks)" | Set-Content -Encoding ascii -NoNewline "$hooksDir\start-demo-long.txt"
-'{"session_id":"demo-long"}' | powershell -ExecutionPolicy Bypass -File "$hooksDir\stop-$pid_.ps1"
-```
-
----
-
-## Path B — Not installed
-
-Source-of-truth for the beep patterns is the `.ps1` files under
-`windows/`. Read them and extract the `[console]::beep(...)` calls
-at demo time, so the demo tracks any local edits to the sounds
-without needing DEMO.md to be updated in lockstep.
-
-### Step 1 (B) — Read notify's beep calls from the source and play them
-
-Read `windows/notify-<PROJECT_ID>.ps1`. Grab every line matching
-`[console]::beep(...)` (there should be two). Chain them with `;` and
-execute in one PowerShell tool call.
-
-Effective command shape (build it from what's in the file):
-
-```powershell
-[console]::beep(1200,150); [console]::beep(1500,200)
-```
-
-Do not hard-code that command from this runbook — read the file, extract
-the actual lines, and run whatever's there. If the user has customized
-notify's sounds, this reflects that.
-
-### Step 5 (B) — Continuation intent (no fourth sound)
-
-Print exactly this if the user chose "Continue":
-
-> Continuing. Playing all three finish sounds by pulling the beep
-> sequences straight out of `windows/stop-cb-<PID>.ps1`. Because the
-> hooks aren't installed on this machine, no real `Stop` event will
-> fire when this turn ends — you'll hear three sounds, not four.
-> If you want the fourth (the real end-of-turn chime), install with
-> `windows/install-cb-<PID>.ps1` first.
-
-### Step 6 (B) — Read stop's three tiers from the source and play them
-
-Read `windows/stop-<PROJECT_ID>.ps1`. It has three tier branches:
-
-- **Long** — the body of `if ($elapsed -gt 120) { ... }` (13 beeps)
-- **Normal** — the body of `elseif ($elapsed -ge 15) { ... }` (4 beeps)
-- **Short** — the body of the terminal `else { ... }` (2 beeps)
-
-Extract the `[console]::beep(...)` calls from each branch. Play them
-in **Short → Normal → Long** order (from lightest to heaviest), same
-labels and 900ms Start-Sleep between tiers as Path A:
-
-```powershell
-Write-Host ""
-Write-Host ">>> [1/3] SHORT - under 15 seconds - 2 beeps"
-# insert the Short branch's beep calls, joined with ;
-Start-Sleep -Milliseconds 900
-
-Write-Host ""
-Write-Host ">>> [2/3] NORMAL - 15 seconds to 2 minutes - 4 beeps"
-# insert the Normal branch's beep calls
-Start-Sleep -Milliseconds 900
-
-Write-Host ""
-Write-Host ">>> [3/3] LONG - over 2 minutes - 13-beep cascade"
-# insert the Long branch's beep calls
-```
-
-Do not invoke `stop-<PID>.ps1` from the repo — it hardcodes
-`$env:USERPROFILE\.claude\hooks\start-<session_id>.txt` as its
-timestamp path, which would require creating the hooks directory
-just to satisfy it. Extracting the beep calls is cleaner.
-
----
-
-## Common — Steps 2, 3, 4 (both paths)
-
-### Step 2 — Explain what they just heard (in your response text)
+## Step 2 — Explain what they just heard (in your response text)
 
 Emit this text (or a close paraphrase — meaning matters, not exact
 words):
@@ -167,7 +44,7 @@ words):
 > server asking for input mid-task. You're hearing it *now* because
 > I'm about to ask you a question.
 
-### Step 3 — Show the finish-sound tiers
+## Step 3 — Show the finish-sound tiers
 
 Print this table in your response text:
 
@@ -181,7 +58,7 @@ Print this table in your response text:
 > | **15 seconds to 2 minutes** | Normal | 4-beep pattern (C5 E5 C5 E5) |
 > | **Over 2 minutes** | Long | 13-beep cascade ending on a long C6 ring |
 
-### Step 4 — AskUserQuestion (continue / quit)
+## Step 4 — AskUserQuestion (continue / quit)
 
 Call `AskUserQuestion` with a single question and two options:
 
@@ -193,49 +70,99 @@ Call `AskUserQuestion` with a single question and two options:
 If the user quits, acknowledge briefly and stop. Do not play the finish
 sounds.
 
----
+## Step 5 — Continuation intent
 
-## Step 7 — Wrap up (both paths)
+Print exactly this if the user chose "Continue" **and the plugin is
+installed**:
+
+> Continuing. Playing all three finish sounds through `scripts/stop.ps1`
+> — plus the final "done" sound for this turn itself, which will fire
+> naturally at end-of-turn based on how long the whole conversation
+> has been running.
+
+They'll hear four sounds total: the three demo tiers plus the real
+`Stop` event when your response ends.
+
+If the plugin is **not** installed, print this instead:
+
+> Continuing. Playing all three finish sounds through `scripts/stop.ps1`.
+> Because the plugin isn't installed on this machine, no real `Stop`
+> event will fire when this turn ends — you'll hear three sounds, not
+> four. If you want the fourth (the real end-of-turn chime), install
+> with `/plugin marketplace add dsopko/claude-beeps` then
+> `/plugin install claude-beeps@claude-beeps`.
+
+## Step 6 — Play the three tiers
+
+The scripts run outside the hook runner here, so they use the fallback
+state dir `~\.claude\hooks\` (created on demand). The fake session ids
+never collide with a real session, and `stop.ps1` deletes each
+timestamp file it consumes.
+
+```powershell
+$stateDir = "$env:USERPROFILE\.claude\hooks"
+New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
+
+Write-Host ""
+Write-Host ">>> [1/3] SHORT - under 15 seconds - 2 beeps"
+"$((Get-Date).Ticks)" | Set-Content -Encoding ascii -NoNewline "$stateDir\start-demo-short.txt"
+'{"session_id":"demo-short"}' | powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
+Start-Sleep -Milliseconds 900
+
+Write-Host ""
+Write-Host ">>> [2/3] NORMAL - 15 seconds to 2 minutes - 4 beeps"
+"$(((Get-Date).AddSeconds(-30)).Ticks)" | Set-Content -Encoding ascii -NoNewline "$stateDir\start-demo-normal.txt"
+'{"session_id":"demo-normal"}' | powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
+Start-Sleep -Milliseconds 900
+
+Write-Host ""
+Write-Host ">>> [3/3] LONG - over 2 minutes - 13-beep cascade"
+"$(((Get-Date).AddSeconds(-180)).Ticks)" | Set-Content -Encoding ascii -NoNewline "$stateDir\start-demo-long.txt"
+'{"session_id":"demo-long"}' | powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
+```
+
+If the user has customized the sounds in `scripts/stop.ps1`, this
+plays their customizations — the demo always runs whatever is in the
+repo's source files.
+
+## Step 7 — Wrap up
 
 Say the demo is done in one sentence.
 
-**Path A:** note that the fourth sound the user is about to hear (the
-real end-of-turn `Stop` chime) will play based on the actual duration
-of this whole conversation turn — so if you've been running long,
-they'll hear the Long tier for real.
+**Installed:** note that the fourth sound the user is about to hear
+(the real end-of-turn `Stop` chime) will play based on the actual
+duration of this whole conversation turn — so if you've been running
+long, they'll hear the Long tier for real.
 
-**Path B:** offer to run the installer now (`windows/install-cb-<PID>.ps1`)
-so the user can hear the sounds fire naturally during real work, not
-just in the demo.
+**Not installed:** offer to install now (SETUP.md) so the user can
+hear the sounds fire naturally during real work, not just in the demo.
 
-Optionally offer either path:
-- Replay any single sound (they name it, you play it — installed hook
-  or source-extraction depending on which path you're on)
-- Show `notify.log` entries the demo wrote (Path A only; Path B doesn't
-  write to the log)
-- Explain the source files that produced the sounds
+Optionally offer either way:
+- Replay any single sound (they name it, you play it).
+- Explain the source files that produced the sounds.
 
 ## Notes
 
 - **AskUserQuestion does fire the Notification hook.** Verified on
   Claude Code v2.1.250: an `AskUserQuestion` call raises a
   `Notification` event with `notification_type: agent_needs_input`,
-  and `notify.log` records it. Earlier drafts of this file claimed
-  the opposite — that was wrong. That means in Path A, the natural
-  firing of the hook at Step 4 (when the AskUserQuestion appears)
-  will play the chime *again* on top of the Step 1 manual play, so
-  the user hears it twice — separated by however long the Step 2/3
+  and the plugin's `notify.log` records it. Earlier drafts of this
+  file claimed the opposite — that was wrong. When the plugin is
+  installed, the natural firing at Step 4 (when the AskUserQuestion
+  appears) plays the chime *again* on top of the Step 1 manual play,
+  so the user hears it twice — separated by however long the Step 2/3
   explanation and table take to read. Not a bug: the second firing
   proves the whole hook chain works during real interactive use, not
-  just via pipe-tests. If it feels noisy, drop the Step 1 manual
-  play and rewrite Step 2's explanation in future tense
-  ("You'll hear the chime when I ask you the next question")
-  instead of past tense.
+  just via pipe-tests. If it feels noisy, drop the Step 1 manual play
+  and rewrite Step 2's explanation in future tense ("You'll hear the
+  chime when I ask you the next question") instead of past tense.
 - Real `PermissionRequest` events (Claude asking to run a
-  non-allowlisted tool) also fire the hook reliably. If the user
-  wants to hear a permission-triggered chime, run any tool that
-  isn't in their `permissions.allow` list.
-- Path A leaves no lingering state: `stop-<PID>.ps1` deletes its own
-  timestamp file, and the fake `session_id`s used here never collide
-  with the current Claude Code session's id.
-- Path B leaves no lingering state at all — nothing is written to disk.
+  non-allowlisted tool) also fire the hook reliably. If the user wants
+  to hear a permission-triggered chime, run any tool that isn't in
+  their `permissions.allow` list.
+- The demo leaves no lingering state: `stop.ps1` deletes its own
+  timestamp files, and the fake `session_id`s never collide with the
+  current session's id. Pipe-runs do append to the *fallback* log
+  (`~/.claude/hooks/notify.log`), not the plugin data dir's log —
+  which is exactly why demo entries can never be mistaken for the
+  liveness evidence CLAUDE.md rule 3 asks for.

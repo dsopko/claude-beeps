@@ -8,7 +8,7 @@
           {
             "type": "command",
             "command": "powershell",
-            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/windows/notify-cb-88a85f67-1b7d-44ad-b9b3-728d218952bc.ps1"]
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/scripts/notify.ps1"]
           }
         ]
       }
@@ -19,7 +19,7 @@
           {
             "type": "command",
             "command": "powershell",
-            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/windows/notify-cb-88a85f67-1b7d-44ad-b9b3-728d218952bc.ps1"]
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/scripts/notify.ps1"]
           }
         ]
       }
@@ -30,7 +30,7 @@
           {
             "type": "command",
             "command": "powershell",
-            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/windows/start-cb-88a85f67-1b7d-44ad-b9b3-728d218952bc.ps1"]
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/scripts/start.ps1"]
           }
         ]
       }
@@ -41,7 +41,7 @@
           {
             "type": "command",
             "command": "powershell",
-            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/windows/stop-cb-88a85f67-1b7d-44ad-b9b3-728d218952bc.ps1"]
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/scripts/stop.ps1"]
           }
         ]
       }
