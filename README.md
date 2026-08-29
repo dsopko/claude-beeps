@@ -95,7 +95,16 @@ tiers), then hand-off.
 - Three PowerShell scripts land in `%USERPROFILE%\.claude\hooks\`.
 - Your `%USERPROFILE%\.claude\settings.json` gets a backup at
   `settings.json.bak-install-<timestamp>` and then hook entries are
-  merged in — nothing else is touched.
+  merged in — nothing else is touched. A pre-existing claude-beeps
+  hook group for this same PROJECT_ID is announced by its command
+  and replaced in place.
+- If a pre-1.0 (bare-name) claude-beeps install is present, the
+  installer performs a one-time announced migration. It prints
+  `Found pre-1.0 claude-beeps install - migrating`, removes the
+  matching hook groups from the four managed events, and deletes
+  the legacy `.ps1` files. Each removed group and each deleted
+  file appears on the console. Absent those files, the migration
+  step does nothing.
 - The hooks go live on their own within seconds — the next turn plays
   the "done" chime. No reload or restart needed on current Claude Code
   (see [gotcha 3](#gotchas)).
@@ -262,13 +271,19 @@ event key; remove only the hook groups whose `command` references this
 project's scripts.
 
 **Fingerprint of a claude-beeps hook (this project):** `type: "command"`
-where the inner `hooks[].command` mentions `notify-cb-<PID>.ps1`,
+where the inner `hooks[].command` names `notify-cb-<PID>.ps1`,
 `start-cb-<PID>.ps1`, or `stop-cb-<PID>.ps1` (or the `.sh` equivalents
-on WSL). The uninstaller also matches the legacy pre-GUID names
-(`notify.ps1` / `start.ps1` / `stop.ps1`) for backwards compatibility.
-Anything else in those arrays (HTTP hooks, other projects' hooks with
-different GUIDs, different paths) belongs to something else — leave it
-alone.
+on WSL). The uninstaller also matches the anchored legacy pattern
+`\.claude/hooks/(notify|start|stop).ps1` (or `.sh`), so a pre-GUID
+install still cleans up — but only when the command path resolves
+inside the Claude hooks directory. Third-party hooks whose command
+merely ends with `notify.ps1`, `start.ps1`, or `stop.ps1` — for
+example `restart.ps1`, `.../slack-notify.ps1`, or a
+`.../hooks/autostop.ps1` outside `.claude` — are never touched.
+Anything else in those arrays (HTTP hooks, other projects' hooks
+with different GUIDs, different paths) belongs to something else —
+leave it alone. Every removal is announced on the console with the
+group's command, so no eviction is ever silent.
 
 **Ask Claude:** in a session started from this repo, say "uninstall
 claude-beeps" / "start clean" / "remove". Claude follows CLAUDE.md's
