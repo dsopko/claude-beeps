@@ -107,7 +107,7 @@ tiers), then hand-off.
   step does nothing.
 - The hooks go live on their own within seconds — the next turn plays
   the "done" chime. No reload or restart needed on current Claude Code
-  (see [gotcha 3](#gotchas)).
+  (see [gotcha 3](#six-gotchas-all-lessons-learned-the-hard-way)).
 
 **Prefer to install without Claude?** The install script is the same
 one Claude runs — you can drive it yourself:
