@@ -1,0 +1,14 @@
+{
+  "name": "claude-beeps",
+  "owner": {
+    "name": "David Sopko"
+  },
+  "description": "Marketplace for the claude-beeps plugin: audible chimes for Claude Code on Windows.",
+  "plugins": [
+    {
+      "name": "claude-beeps",
+      "source": "./",
+      "description": "Audible chimes for Claude Code on Windows: needs-input chime plus duration-tiered turn-finished sounds."
+    }
+  ]
+}

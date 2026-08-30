@@ -1,0 +1,50 @@
+{
+  "description": "claude-beeps: needs-input chime (Notification/PermissionRequest) and duration-tiered finish sounds (UserPromptSubmit/Stop pair). Exec form - no shell tokenization, so paths with spaces are safe. Windows only; the scripts exit 0 quietly elsewhere.",
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "agent_needs_input|elicitation_dialog|elicitation_url_dialog|quota_auto_resume_stale|quota_auto_resume_disabled",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/scripts/notify.ps1"]
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/scripts/notify.ps1"]
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/scripts/start.ps1"]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PLUGIN_ROOT}/scripts/stop.ps1"]
+          }
+        ]
+      }
+    ]
+  }
+}
