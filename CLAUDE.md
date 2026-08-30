@@ -63,14 +63,7 @@ user wants — common answers include:
    update (or `--plugin-dir` during development).
 2. **Never write to `~/.claude/settings.json` on this project's
    behalf.** The plugin system owns registration: Claude Code records
-   an `enabledPlugins` entry itself at install time. If a legacy
-   (pre-plugin) claude-beeps install is present — hook groups in
-   settings.json referencing `notify-cb-*.ps1` / `start-cb-*.ps1` /
-   `stop-cb-*.ps1`, or bare `notify.ps1` etc. under
-   `~/.claude/hooks/` — tell the user, and only with their approval
-   remove *those specific hook groups* (backup first, never wipe whole
-   event keys; Claude Code adds its own internal hooks under the same
-   events).
+   an `enabledPlugins` entry itself at install time.
 3. **Never claim the beep is live without evidence — and never claim
    it isn't, either.** Pipe-testing the `.ps1` files or playing the
    demo proves only that the scripts run and the audio device works —

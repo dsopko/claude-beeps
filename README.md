@@ -5,15 +5,12 @@ input or permission, and a duration-tiered "task complete" sound so
 you can hear from another room whether the last turn was quick, normal,
 or a long-running task.
 
-claude-beeps is a **Claude Code plugin**. Installing it never touches
-your `~/.claude/settings.json` — the plugin ships its hooks in
-`hooks/hooks.json`, and Claude Code merges them with your own hooks in
-memory when the plugin is enabled.
+claude-beeps is a **Claude Code plugin**, installed with two `/plugin`
+commands.
 
 **Windows only.** The sounds use the Windows-only `[console]::beep`
-.NET API. The plugin system has no platform gating, so the hooks do
-fire on other platforms — each script opens with a guard that exits
-quietly off-Windows (see [gotcha 6](#six-gotchas-all-lessons-learned-the-hard-way)).
+.NET API. The hooks exit quietly on other platforms (see
+[gotcha 4](#four-gotchas-all-lessons-learned-the-hard-way)).
 
 ## What you get
 
@@ -91,8 +88,7 @@ claude-beeps/
 - Claude Code copies the plugin to
   `~/.claude/plugins/cache/claude-beeps/claude-beeps/<version>/` on
   install and records one `enabledPlugins` entry in the settings scope
-  you chose. That entry is the only settings change, and Claude Code
-  itself writes it.
+  you chose.
 - `hooks/hooks.json` registers the four events. Each hook uses **exec
   form** — `"command": "powershell"` plus an `args` array — so no shell
   ever parses the command line: backslashes, spaces in paths, and
@@ -115,18 +111,9 @@ claude-beeps/
 - All three scripts read the hook input JSON from stdin via
   `[Console]::In.ReadToEnd() | ConvertFrom-Json`.
 
-## Six gotchas (all lessons learned the hard way)
+## Four gotchas (all lessons learned the hard way)
 
-1. **Both `Notification` AND `PermissionRequest` are needed, but
-   `Notification` needs a matcher.** `Notification` fires for twelve
-   subtypes — including a ~60s post-turn idle nag (`idle_prompt`) that
-   will drive you crazy without a filter. Permission prompts use the
-   separate `PermissionRequest` event, and also re-fire ~6s later as
-   `Notification(permission_prompt)`, which would double-beep. We wire
-   both events but restrict the `Notification` hook to a whitelist via
-   the `matcher` field. See [Notification subtype filtering](#notification-subtype-filtering).
-
-2. **Verify liveness from evidence, don't assume.** Piping JSON into
+1. **Verify liveness from evidence, don't assume.** Piping JSON into
    the `.ps1` files yourself proves the scripts and your speakers work
    — nothing more. Proof the plugin's hooks are actually registered
    and firing is:
@@ -139,23 +126,19 @@ claude-beeps/
    If a full turn passes with neither signal, run `/reload-plugins`,
    or restart `claude`.
 
-3. **Bypass-permissions mode kills `PermissionRequest`.** If you run
-   `--dangerously-skip-permissions` or accepted bypass mode, no
-   permission prompts fire, so the chime doesn't either. Not a bug.
-
-4. **Chat-render wrapping breaks pasted commands.** When copying
+2. **Chat-render wrapping breaks pasted commands.** When copying
    multi-line PowerShell out of a rendered chat block, use the "Copy
    code" button — click-and-drag selection can turn visual wraps into
    real newlines, which breaks parsing mid-token. Or use short helper
    functions / dot-sourced files (see `demo/beeps.ps1`) so paste-able
    lines stay short.
 
-5. **`notify.log` is the smoking gun.** If a beep doesn't play, check
+3. **`notify.log` is the smoking gun.** If a beep doesn't play, check
    `notify.log` in the plugin data dir (or `~/.claude/hooks/` for
    pipe-tests). Timestamp present but no sound = Windows audio
-   problem. No timestamp = hook not wired or not loaded (see #2).
+   problem. No timestamp = hook not wired or not loaded (see #1).
 
-6. **Plugin hooks fire on every OS.** There is no platform-gating
+4. **Plugin hooks fire on every OS.** There is no platform-gating
    field anywhere in the plugin system — not in `plugin.json`, not in
    marketplace entries, not in `hooks.json`. That's why every script
    opens with `if ($env:OS -ne 'Windows_NT') { exit 0 }`: anywhere
@@ -243,23 +226,9 @@ What to edit:
 /plugin uninstall claude-beeps@claude-beeps
 ```
 
-That's the whole uninstall — the plugin never wrote to your
-`settings.json`, so there is nothing to clean up there beyond the
-`enabledPlugins` entry Claude Code removes itself. Optionally delete
-the plugin's data directory (`notify.log` and any leftover
-`start-*.txt` under `~/.claude/plugins/data/<id>/`).
+Optionally delete the plugin's data directory afterwards
+(`notify.log` and any leftover `start-*.txt` under
+`~/.claude/plugins/data/<id>/`).
 
 Removing the marketplace (`/plugin marketplace remove claude-beeps`)
 also uninstalls the plugin.
-
-## WSL and other platforms
-
-The pre-plugin versions of claude-beeps (a PowerShell installer that
-merged hook entries into `~/.claude/settings.json`, plus bash
-equivalents for WSL) were retired when the project became a plugin;
-they live in git history if you need them. The plugin does not support
-WSL yet: its hooks spawn `powershell`, which WSL sessions can't resolve
-(interop exposes `powershell.exe`, and `${CLAUDE_PLUGIN_ROOT}` is a
-Linux path Windows PowerShell can't read). Linux and macOS have no
-`[console]::beep` at all. If you had the old WSL setup installed by
-hand, remove its entries from your WSL-side `~/.claude/settings.json`.
