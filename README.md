@@ -10,7 +10,7 @@ commands.
 
 **Windows only.** The sounds use the Windows-only `[console]::beep`
 .NET API. The hooks exit quietly on other platforms (see
-[gotcha 4](#four-gotchas-all-lessons-learned-the-hard-way)).
+[Troubleshooting](#troubleshooting)).
 
 ## What you get
 
@@ -111,43 +111,6 @@ claude-beeps/
 - All three scripts read the hook input JSON from stdin via
   `[Console]::In.ReadToEnd() | ConvertFrom-Json`.
 
-## Four gotchas (all lessons learned the hard way)
-
-1. **Verify liveness from evidence, don't assume.** Piping JSON into
-   the `.ps1` files yourself proves the scripts and your speakers work
-   — nothing more. Proof the plugin's hooks are actually registered
-   and firing is:
-
-   - a line in the plugin's `notify.log` (under
-     `~/.claude/plugins/data/<id>/`) you didn't pipe in yourself
-   - `start-<session_id>.txt` appearing there for your *current*
-     session after you submit a prompt
-
-   If a full turn passes with neither signal, run `/reload-plugins`,
-   or restart `claude`.
-
-2. **Chat-render wrapping breaks pasted commands.** When copying
-   multi-line PowerShell out of a rendered chat block, use the "Copy
-   code" button — click-and-drag selection can turn visual wraps into
-   real newlines, which breaks parsing mid-token. Or use short helper
-   functions / dot-sourced files (see `demo/beeps.ps1`) so paste-able
-   lines stay short.
-
-3. **`notify.log` is the smoking gun.** If a beep doesn't play, check
-   `notify.log` in the plugin data dir (or `~/.claude/hooks/` for
-   pipe-tests). Timestamp present but no sound = Windows audio
-   problem. No timestamp = hook not wired or not loaded (see #1).
-
-4. **Plugin hooks fire on every OS.** There is no platform-gating
-   field anywhere in the plugin system — not in `plugin.json`, not in
-   marketplace entries, not in `hooks.json`. That's why every script
-   opens with `if ($env:OS -ne 'Windows_NT') { exit 0 }`: anywhere
-   PowerShell exists off-Windows (pwsh on Linux/macOS, cloud
-   sessions), the hook exits silently instead of erroring every turn.
-   Where `powershell` isn't on `PATH` at all, the spawn fails as a
-   non-blocking error notice — annoying but harmless. Don't enable the
-   plugin on non-Windows machines.
-
 ## Notification subtype filtering
 
 Claude Code's `Notification` event carries a `notification_type` field
@@ -232,3 +195,33 @@ Optionally delete the plugin's data directory afterwards
 
 Removing the marketplace (`/plugin marketplace remove claude-beeps`)
 also uninstalls the plugin.
+
+## Troubleshooting
+
+1. **Verify liveness from evidence, don't assume.** Piping JSON into
+   the `.ps1` files yourself proves the scripts and your speakers work
+   — nothing more. Proof the plugin's hooks are actually registered
+   and firing is:
+
+   - a line in the plugin's `notify.log` (under
+     `~/.claude/plugins/data/<id>/`) you didn't pipe in yourself
+   - `start-<session_id>.txt` appearing there for your *current*
+     session after you submit a prompt
+
+   If a full turn passes with neither signal, run `/reload-plugins`,
+   or restart `claude`.
+
+2. **`notify.log` is the smoking gun.** If a beep doesn't play, check
+   `notify.log` in the plugin data dir (or `~/.claude/hooks/` for
+   pipe-tests). Timestamp present but no sound = Windows audio
+   problem. No timestamp = hook not wired or not loaded (see #1).
+
+3. **Plugin hooks fire on every OS.** There is no platform-gating
+   field anywhere in the plugin system — not in `plugin.json`, not in
+   marketplace entries, not in `hooks.json`. That's why every script
+   opens with `if ($env:OS -ne 'Windows_NT') { exit 0 }`: anywhere
+   PowerShell exists off-Windows (pwsh on Linux/macOS, cloud
+   sessions), the hook exits silently instead of erroring every turn.
+   Where `powershell` isn't on `PATH` at all, the spawn fails as a
+   non-blocking error notice — annoying but harmless. Don't enable the
+   plugin on non-Windows machines.
