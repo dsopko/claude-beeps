@@ -216,7 +216,16 @@ also uninstalls the plugin.
    pipe-tests). Timestamp present but no sound = Windows audio
    problem. No timestamp = hook not wired or not loaded (see #1).
 
-3. **Plugin hooks fire on every OS.** There is no platform-gating
+3. **Bypass-permissions mode kills `PermissionRequest`.** If you run
+   `--dangerously-skip-permissions` or accepted bypass mode, no
+   permission prompts fire, so the chime doesn't either. Not a bug.
+
+4. **No WSL support yet.** The hooks spawn `powershell`, which a WSL
+   session can't resolve — interop exposes `powershell.exe`, and
+   `${CLAUDE_PLUGIN_ROOT}` is a Linux path Windows PowerShell can't
+   read. Install the plugin on the Windows side instead.
+
+5. **Plugin hooks fire on every OS.** There is no platform-gating
    field anywhere in the plugin system — not in `plugin.json`, not in
    marketplace entries, not in `hooks.json`. That's why every script
    opens with `if ($env:OS -ne 'Windows_NT') { exit 0 }`: anywhere

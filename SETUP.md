@@ -34,9 +34,15 @@ there adds noise at best.
 
 ## 3. Check for prior state
 
-If `claude plugin list` shows `claude-beeps`, it is already installed:
-switch to operating mode (CLAUDE.md) and stop — don't reinstall
-unasked.
+- `claude plugin list` shows `claude-beeps` → already installed. Switch
+  to operating mode (CLAUDE.md) and stop — don't reinstall unasked.
+- Legacy pre-plugin install: hook groups in `~/.claude/settings.json`
+  whose commands reference `notify-cb-*.ps1` / `start-cb-*.ps1` /
+  `stop-cb-*.ps1` (or bare `notify.ps1` etc. under
+  `~/.claude/hooks/`). Report it plainly. Offer to remove those
+  specific hook groups (CLAUDE.md rule 2: backup first, never wipe
+  whole event keys) — otherwise the user will get **double beeps**
+  once the plugin is enabled. Do not remove without approval.
 
 ## 4. Interview
 
@@ -44,6 +50,9 @@ Keep it short. Ask only what actually branches the install.
 
 1. **Confirm the plan.** "I'll add this repo as a plugin marketplace
    and install the claude-beeps plugin at user scope. OK?" If no, stop.
+2. **Only if a legacy install was found in step 3:** get a yes/no on
+   removing the old hook groups (with backup) before enabling the
+   plugin.
 
 Do **not** ask about sound customization, thresholds, or the
 Notification matcher. Ship the defaults; direct customization requests
