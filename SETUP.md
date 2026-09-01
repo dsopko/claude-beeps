@@ -30,8 +30,7 @@ it tight — the user is a developer.
 
 **If you detect WSL or Linux/macOS:** stop and say the beeps are
 Windows-only (`[console]::beep` under .NET). Installing the plugin
-there adds noise at best. The pre-plugin WSL scripts live in git
-history; the plugin has no WSL path yet.
+there adds noise at best.
 
 ## 3. Check for prior state
 
@@ -50,9 +49,7 @@ history; the plugin has no WSL path yet.
 Keep it short. Ask only what actually branches the install.
 
 1. **Confirm the plan.** "I'll add this repo as a plugin marketplace
-   and install the claude-beeps plugin at user scope. Nothing touches
-   your settings.json except the one `enabledPlugins` entry Claude
-   Code writes itself. OK?" If no, stop.
+   and install the claude-beeps plugin at user scope. OK?" If no, stop.
 2. **Only if a legacy install was found in step 3:** get a yes/no on
    removing the old hook groups (with backup) before enabling the
    plugin.
