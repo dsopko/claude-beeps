@@ -1,6 +1,6 @@
 # claude-beeps
 
-Stop babysittign your claude terminals get an audible alert when your prompt finishes or needs you.
+Stop babysitting your claude terminals get an audible alert when your prompt finishes or needs you.
 
 Hooks for Claude Code — a rising chime when Claude needs your
 input or permission, and a duration-tiered "task complete" sound so
